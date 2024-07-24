@@ -2,6 +2,7 @@ use crate::data::api::ASRMessage;
 use std::{error::Error, future::Future};
 
 use pgmq::{Message, PGMQueue};
+use ulid::Ulid;
 
 #[derive(Clone)]
 pub struct PQueue {
@@ -27,8 +28,10 @@ impl PQueue {
     }
 
     pub async fn add_job(&self, file: &str) -> Result<(), Box<dyn Error>> {
+        let ulid = Ulid::new();
         let message = ASRMessage {
             file: file.to_string(),
+            id: ulid.to_string(),
         };
         log::info!("Sending msg: {:?}", message);
         let id: i64 = self

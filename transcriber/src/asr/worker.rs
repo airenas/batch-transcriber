@@ -8,7 +8,7 @@ use crate::{data::api::ASRMessage, filer::file::Filer, postgres::queue::PQueue};
 
 pub struct Worker {
     pgmq: PQueue,
-    filer: Filer,
+    // filer: Filer,
     id: i64,
     ct: CancellationToken,
 }
@@ -16,16 +16,16 @@ pub struct Worker {
 impl Worker {
     pub async fn new(
         pgmq: PQueue,
-        filer: Filer,
+        _filer: Filer,
         id: i64,
         ct: CancellationToken,
     ) -> Result<Self, Box<dyn Error>> {
         log::info!("Init Worker");
         Ok(Self {
-            pgmq: pgmq,
-            filer: filer,
-            id: id,
-            ct: ct,
+            pgmq,
+            // filer,
+            id,
+            ct,
         })
     }
 
@@ -36,7 +36,7 @@ impl Worker {
             let res = self
                 .pgmq
                 .process(
-                    |msg: Message<ASRMessage>| async move { return self.process_msg(msg).await },
+                    |msg: Message<ASRMessage>| async move { self.process_msg(msg).await },
                 )
                 .await;
             match res {

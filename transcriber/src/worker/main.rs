@@ -1,8 +1,5 @@
 use std::error::Error;
-use std::time::Duration;
 use tokio::signal;
-use tokio::sync::mpsc;
-use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use transcriber::asr::worker;
@@ -51,7 +48,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
     tracker.close();
 
     match signal::ctrl_c().await {
-        Ok(()) => _ = {
+        Ok(()) => {
             log::info!("Cancel...");
             token.cancel()
         },

@@ -8,7 +8,7 @@ pub struct Filer {
 impl Filer {
     pub fn new(base_dir: String) -> Self {
         log::info!("Creating new Filer with base dir: {}", base_dir);
-        Self { base_dir: base_dir }
+        Self { base_dir }
     }
 
     pub fn move_working(&self, file: &str) -> Result<(), Box<dyn Error>> {

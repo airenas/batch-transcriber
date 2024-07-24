@@ -69,7 +69,7 @@ impl PQueue {
                 Ok(true)
             }
             None => {
-                return Ok(false);
+                Ok(false)
             }
         }
     }

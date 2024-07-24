@@ -13,3 +13,6 @@ Cargo.lock
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 transcriber/Makefile.options
+transcriber/test
+transcriber/.env
+deploy/local/.env

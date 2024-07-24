@@ -16,6 +16,9 @@ test/lint:
 	@cargo clippy -V
 	cargo clippy --all-targets --all-features -- -D warnings
 .PHONY: test/lint	
+###############################################################################
+generate/db:
+	diesel migration run
 
 .EXPORT_ALL_VARIABLES:
 

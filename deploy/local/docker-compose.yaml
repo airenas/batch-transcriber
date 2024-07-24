@@ -18,3 +18,12 @@ services:
       - "5432:5432"
     environment:
       - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=asr
+
+  dbmigrate:
+    image:   airenas/bt-dbmigrate:${MIGRATE_VERSION}
+    logging: *default-logging
+    environment:
+      - DATABASE_URL=${POSTGRES_URL}
+    depends_on:
+      - postgres  

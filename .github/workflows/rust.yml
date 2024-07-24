@@ -1,0 +1,35 @@
+name: rust
+
+on:
+  push:
+    branches: [ main]
+    paths:
+      - "transcriber/**"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "transcriber/**"
+
+jobs:
+  build:
+    name: Run tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./transcriber
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: clippy
+      - name: Build 
+        run: make build/local     
+
+      - name: Test 
+        run: make test/unit     
+
+      - name: Lint 
+        run: make test/lint     

@@ -1,16 +1,27 @@
 use std::{error::Error, time::Duration};
 
+use deadpool_diesel::postgres::Pool;
+use diesel::{RunQueryDsl, SelectableHelper};
 use pgmq::Message;
 use tokio::{select, time::sleep};
 use tokio_util::sync::CancellationToken;
 
-use crate::{data::api::ASRMessage, filer::file::Filer, postgres::queue::PQueue};
+use crate::{
+    data::api::ASRMessage,
+    filer::file::Filer,
+    model::{
+        models::WorkData,
+        schema::{self},
+    },
+    postgres::queue::PQueue,
+};
 
 pub struct Worker {
     pgmq: PQueue,
     // filer: Filer,
     id: i64,
     ct: CancellationToken,
+    pool: Pool,
 }
 
 impl Worker {
@@ -19,6 +30,7 @@ impl Worker {
         _filer: Filer,
         id: i64,
         ct: CancellationToken,
+        pool: Pool,
     ) -> Result<Self, Box<dyn Error>> {
         log::info!("Init Worker");
         Ok(Self {
@@ -26,6 +38,7 @@ impl Worker {
             // filer,
             id,
             ct,
+            pool,
         })
     }
 
@@ -35,9 +48,7 @@ impl Worker {
             let mut was: bool = false;
             let res = self
                 .pgmq
-                .process(
-                    |msg: Message<ASRMessage>| async move { self.process_msg(msg).await },
-                )
+                .process(|msg: Message<ASRMessage>| async move { self.process_msg(msg).await })
                 .await;
             match res {
                 Ok(v) => {
@@ -75,6 +86,30 @@ impl Worker {
             log::warn!("Max retries reached");
             return Ok(true);
         }
+
+        let msg = msg.message;
+
+        let work_data = WorkData {
+            id: msg.id.clone(),
+            external_id: "".to_string(),
+            file_name: msg.file.clone(),
+            base_dir: msg.base_dir.clone(),
+            try_count: 0,
+            created: chrono::Utc::now().naive_utc(),
+            updated: chrono::Utc::now().naive_utc(),
+        };
+        let conn = self.pool.get().await?;
+
+        let result = conn
+            .interact(move |conn| {
+                diesel::insert_into(schema::work_data::table)
+                    .values(&work_data)
+                    .returning(WorkData::as_returning())
+                    .execute(conn)
+            })
+            .await
+            .map_err(|err| format!("can't insert: {}", err))??;
+        log::info!("Inserted: {:?}", result);
         Err("some err".into())
         // Ok(true)
     }

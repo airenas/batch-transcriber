@@ -35,12 +35,13 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
     log::info!("Connecting to postgres...");
     let pq = PQueue::new(args.postgres_url).await?;
     if !args.only_msg {
-        let f = Filer::new(args.base_dir);
+        let f = Filer::new(args.base_dir.clone());
         f.move_working(args.file.as_str())?;
     } else {
         log::warn!("Skip copying file");
     }
-    pq.add_job(args.file.as_str()).await?;
+    pq.add_job(args.file.as_str(), args.base_dir.as_str())
+        .await?;
 
     log::info!("Done");
     Ok(())

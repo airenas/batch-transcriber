@@ -1,3 +1,5 @@
+use deadpool_diesel::postgres::{Manager, Pool};
+use deadpool_diesel::Runtime;
 use std::error::Error;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
@@ -29,15 +31,17 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
 
     let f = Filer::new(args.base_dir);
     log::info!("Connecting to postgres...");
-    let pq = PQueue::new(args.postgres_url).await?;
+    let pq = PQueue::new(args.postgres_url.clone()).await?;
 
-    // let (shutdown_send, mut shutdown_recv) = mpsc::unbounded_channel();
+    let manager = Manager::new(args.postgres_url, Runtime::Tokio1);
+    let pool = Pool::builder(manager).max_size(8).build()?;
     let token = CancellationToken::new();
 
     let tracker = TaskTracker::new();
 
     for i in 0..1 {
-        let worker = worker::Worker::new(pq.clone(), f.clone(), i, token.clone()).await?;
+        let worker =
+            worker::Worker::new(pq.clone(), f.clone(), i, token.clone(), pool.clone()).await?;
         tracker.spawn(async move {
             if let Err(e) = worker.run().await {
                 log::error!("{}", e);
@@ -51,7 +55,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
         Ok(()) => {
             log::info!("Cancel...");
             token.cancel()
-        },
+        }
         Err(err) => {
             return Err(format!("Error registering signal handler: {}", err).into());
         }

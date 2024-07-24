@@ -1,4 +1,4 @@
-use crate::data::api::ASRMessage;
+use crate::{data::api::ASRMessage};
 use std::{error::Error, future::Future};
 
 use pgmq::{Message, PGMQueue};
@@ -27,11 +27,12 @@ impl PQueue {
         })
     }
 
-    pub async fn add_job(&self, file: &str) -> Result<(), Box<dyn Error>> {
+    pub async fn add_job(&self, file: &str, base_dir: &str) -> Result<(), Box<dyn Error>> {
         let ulid = Ulid::new();
         let message = ASRMessage {
             file: file.to_string(),
             id: ulid.to_string(),
+            base_dir: base_dir.to_string(),
         };
         log::info!("Sending msg: {:?}", message);
         let id: i64 = self

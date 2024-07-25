@@ -2,7 +2,7 @@
 log?=INFO
 ###############################################################################
 run/worker:
-	RUST_LOG=$(log) cargo run --bin worker -- --base-dir=./test
+	RUST_LOG=$(log) cargo run --bin worker -- --base-dir=./test -w=2
 .PHONY: run/worker
 ###############################################################################
 build/local: 

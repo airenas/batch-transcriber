@@ -22,6 +22,10 @@ struct Args {
     /// Postgres SQL (QUEUE) connection string
     #[arg(short, long, env)]
     postgres_url: String,
+
+    /// Background worker count
+    #[arg(short, long, env, default_value = "1")]
+    worker_count: i32,
 }
 
 async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
@@ -39,7 +43,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
 
     let tracker = TaskTracker::new();
 
-    for i in 0..1 {
+    for i in 0..args.worker_count {
         let worker =
             worker::Worker::new(pq.clone(), f.clone(), i, token.clone(), pool.clone()).await?;
         tracker.spawn(async move {

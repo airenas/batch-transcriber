@@ -1,5 +1,5 @@
 use crate::{data::api::ASRMessage};
-use std::{error::Error, future::Future};
+use std::{error::Error, future::Future, time::Duration};
 
 use pgmq::{Message, PGMQueue};
 use ulid::Ulid;
@@ -41,6 +41,17 @@ impl PQueue {
             .await
             .map_err(|err| format!("Can't send: {}", err))?;
         log::info!("send: {}", id);
+        Ok(())
+    }
+
+    pub async fn mark_working(&self, id: i64) -> Result<(), Box<dyn Error>> {
+        log::info!("Updating msg: {:?}", id);
+        let vt = chrono::Utc::now() + Duration::from_secs(30);
+        let message: Option<Message<ASRMessage>> = self
+            .pgmq
+            .set_vt(&self.queue_name, id, vt).await
+            .map_err(|err| format!("Can't set: {}", err))?;
+        log::info!("updated: {:?}", message);
         Ok(())
     }
 

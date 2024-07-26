@@ -46,7 +46,7 @@ impl PQueue {
 
     pub async fn mark_working(&self, id: i64) -> Result<(), Box<dyn Error>> {
         log::info!("Updating msg: {:?}", id);
-        let vt = chrono::Utc::now() + Duration::from_secs(30);
+        let vt = chrono::Utc::now() + Duration::from_secs(60);
         let message: Option<Message<ASRMessage>> = self
             .pgmq
             .set_vt(&self.queue_name, id, vt).await

@@ -1,9 +1,10 @@
+use std::time::Instant;
 use std::{error::Error, time::Duration};
 
 use deadpool_diesel::postgres::Pool;
 use diesel::query_dsl::methods::FilterDsl;
 use diesel::ExpressionMethods;
-use diesel::{RunQueryDsl, SelectableHelper};
+use diesel::RunQueryDsl;
 use pgmq::Message;
 use tokio::{select, task::JoinHandle, time::sleep};
 use tokio_util::sync::CancellationToken;
@@ -83,86 +84,163 @@ impl Worker {
         msg: Message<ASRMessage>,
     ) -> Result<bool, Box<dyn Error + Send + Sync>> {
         log::info!("Process {:?}", msg);
-        // sleep(Duration::from_secs(5)).await;
         if msg.read_ct > 3 {
             log::warn!("Max retries reached");
+            self.send_status(false, "max retries reached").await?;
             return Ok(true);
         }
-
         let msg_asr = msg.message;
+        let mut item = self.load_item(msg_asr.clone()).await?;
+        let ct = CancellationToken::new();
+        let job_handle: JoinHandle<()> = self.keep_in_progress(ct.clone(), msg.msg_id);
 
-        let item = WorkData {
-            id: msg_asr.id.clone(),
-            external_id: "".to_string(),
-            file_name: msg_asr.file.clone(),
-            base_dir: msg_asr.base_dir.clone(),
-            try_count: 0,
-            created: chrono::Utc::now().naive_utc(),
-            updated: chrono::Utc::now().naive_utc(),
-        };
+        if item.external_id == "" {
+            let external_id = self.upload(&msg_asr).await?;
+            log::info!("Uploaded: {}", external_id);
+            self.update_external_id(msg_asr.id.clone(), external_id.clone())
+                .await?;
+            item.external_id = external_id;
+        }
+
+        let (finished, err) = self.check_status(&item).await?;
+        self.send_status(finished, err.as_str()).await?;
+        log::info!("finish: {}", msg.msg_id);
+        log::debug!("sending cancel signal to update job...");
+        ct.cancel();
+        _ = job_handle.await;
+        log::info!("done: {}", msg.msg_id);
+        Ok(true)
+    }
+
+    async fn load_item(
+        &self,
+        msg_asr: ASRMessage,
+    ) -> Result<WorkData, Box<dyn Error + Send + Sync>> {
         let conn = self.pool.get().await?;
-
         let result = conn
             .interact(move |conn| {
                 use diesel::Connection;
                 conn.transaction(|conn| {
-                    use self::schema::work_data::dsl::*;
                     use diesel::OptionalExtension;
+                    use schema::work_data::dsl::*;
                     let res: Option<WorkData> = work_data
-                        .filter(schema::work_data::id.eq(&item.id))
+                        .filter(schema::work_data::id.eq(msg_asr.id.clone()))
                         .first(conn)
                         .optional()?;
                     if let Some(v) = res {
-                        log::info!("Already exists: {:?}", v.id);
+                        log::info!("Found: {}", v.id);
                         return Ok::<WorkData, Box<dyn Error + Send + Sync>>(v);
                     }
 
-                    _ = diesel::insert_into(schema::work_data::table)
-                        .values(&item)
-                        .returning(WorkData::as_returning())
-                        .execute(conn)?;
-                    Ok(item)
+                    let res: WorkData = diesel::insert_into(work_data)
+                        .values((
+                            id.eq(msg_asr.id.clone()),
+                            file_name.eq(msg_asr.file.clone()),
+                            base_dir.eq(msg_asr.base_dir.clone()),
+                            external_id.eq(""),
+                        ))
+                        .get_result(conn)?;
+                    log::info!("Inserted: {}", res.id);
+                    Ok(res)
                 })
             })
             .await
-            .map_err(|err| format!("can't insert: {}", err))??;
-        log::info!("Inserted: {:?}", result.id);
-        let token = CancellationToken::new();
-        let token_cl = token.clone();
+            .map_err(|err| format!("can't insert/get work data: {}", err))??;
+        Ok(result)
+    }
+
+    async fn update_external_id(
+        &self,
+        id_v: String,
+        external_id_v: String,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let conn = self.pool.get().await?;
+        _ = conn
+            .interact(move |conn| {
+                use schema::work_data::dsl::*;
+                diesel::update(work_data)
+                    .filter(id.eq(id_v))
+                    .set(external_id.eq(external_id_v))
+                    .execute(conn)
+            })
+            .await
+            .map_err(|err| format!("can't update work data: {}", err))??;
+        Ok(())
+    }
+
+    fn keep_in_progress(&self, cl: CancellationToken, q_id: i64) -> JoinHandle<()> {
         let q = self.pgmq.clone();
-        let id = msg.msg_id;
-        let job_handle: JoinHandle<()> = tokio::spawn(async move {
-            log::info!("Start loop...");
+        return tokio::spawn(async move {
+            log::info!("start loop...");
             loop {
                 tokio::select! {
                     _ = sleep(Duration::from_secs(20)) => {}
-                    _ = token_cl.cancelled() => {
-                        log::info!("Job received cancel signal.");
+                    _ = cl.cancelled() => {
+                        log::debug!("job received cancel signal.");
                         break;
                     }
                 }
-                log::info!("Async job running...");
-                if let Err(e) = q.mark_working(id).await {
-                    log::error!("{}", e);
+                log::debug!("async job running...");
+                if let Err(e) = q.mark_working(q_id).await {
+                    log::error!("queue update error {}", e);
                 }
             }
             log::info!("exit loop...");
         });
-        log::info!("Wait for complete");
-        tokio::select! {
-            _ = sleep(Duration::from_secs(180)) => {}
-            _ = self.ct.cancelled() => {
-                log::info!("Worker {} cancelled", self.id);
-                return Ok(false);
-             }
-        }
-        log::info!("get result: {id}");
+    }
 
-        log::info!("finish: {id}");
-        log::info!("Sending cancel signal to the job...");
-        token.cancel();
-        let _ = job_handle.await;
-        log::info!("done: {id}");
-        Ok(true)
+    async fn upload(&self, msg_asr: &ASRMessage) -> Result<String, Box<dyn Error + Send + Sync>> {
+        Ok("11".to_string())
+    }
+
+    async fn get_status(
+        &self,
+        ext_id: &str,
+    ) -> Result<(bool, String), Box<dyn Error + Send + Sync>> {
+        Ok((false, "".to_string()))
+    }
+
+    async fn send_status(&self, ok: bool, error: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        log::info!("send status: {} {}", ok, error);
+        Ok(())
+    }
+
+    async fn check_status(
+        &self,
+        item: &WorkData,
+    ) -> Result<(bool, String), Box<dyn Error + Send + Sync>> {
+        let start_time = Instant::now();
+        let wait_duration = Duration::from_secs(3600);
+        log::info!("start check status: {} {}", item.id, item.external_id);
+        let mut err_count = 0;
+        loop {
+            if start_time.elapsed() >= wait_duration {
+                return Err("status wait timeout".into());
+            }
+            tokio::select! {
+                _ = sleep(Duration::from_secs(10)) => {}
+                _ = self.ct.cancelled() => {
+                    return Err("cancelled".into());
+                }
+            }
+            let v = self.get_status(item.external_id.as_str()).await;
+            match v {
+                Ok(v) => {
+                    err_count = 0;
+                    if v.0 {
+                        log::info!("completed");
+                        return Ok(v);
+                    }
+                }
+                Err(e) => {
+                    err_count += 1;
+                    log::error!("err {}: {}", err_count, e);
+                    if err_count > 3 {
+                        log::error!("max retries reached");
+                        return Ok((false, e.to_string()));
+                    }
+                }
+            }
+        }
     }
 }

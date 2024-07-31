@@ -67,22 +67,7 @@ impl ASRClient {
             .to_str()
             .unwrap()
             .to_string();
-
-        let file = File::open(file_path.clone())
-            .await
-            .map_err(|err| format!("can't open file {}: {}", file_path, err))?;
-        let stream = FramedRead::new(file, BytesCodec::new());
-        let file_body = Body::wrap_stream(stream);
-        // let file_name = file_name.clone();
-        let some_file = multipart::Part::stream(file_body)
-            .file_name(file_name)
-            .mime_str("audio/bin")
-            .map_err(|err| format!("can't prepare multipart: {}", err))?;
-
-        let form = multipart::Form::new()
-            .text("recognizer", self.model.clone())
-            .text("numberOfSpeakers", "")
-            .part("file", some_file);
+        let url = format!("{}/transcriber/upload", self.url);
 
         let mut headers = HeaderMap::new();
         if !self.auth_key.is_empty() {
@@ -96,16 +81,45 @@ impl ASRClient {
             HeaderName::from_static("accept"),
             HeaderValue::from_str("application/json")?,
         )?;
-        log::info!("init hreaders");
-        let url = format!("{}/transcriber/upload", self.url);
-        log::info!("call: {}", url);
-        let res = self
-            .client
-            .post(url)
-            .headers(headers)
-            .multipart(form)
-            .timeout(get_timeout(file_size))
-            .send()
+
+        let policy = RetryPolicy::exponential(Duration::from_secs(2))
+            .with_max_retries(3)
+            .with_jitter(true);
+
+        let res = policy
+            .retry_if(
+                || async {
+                    log::info!("prepare file: {}", file_path);
+                    let file = File::open(file_path.clone())
+                        .await
+                        .map_err(|err| format!("can't open file {}: {}", file_path, err))?;
+                    let stream = FramedRead::new(file, BytesCodec::new());
+                    let file_body = Body::wrap_stream(stream);
+                    let some_file = multipart::Part::stream(file_body)
+                        .file_name(file_name.clone())
+                        .mime_str("audio/bin")
+                        .map_err(|err| format!("can't prepare multipart: {}", err))?;
+
+                    let form = multipart::Form::new()
+                        .text("recognizer", self.model.clone())
+                        .text("numberOfSpeakers", "")
+                        .part("file", some_file);
+
+                    log::info!("call: {}", url);
+
+                    let res = self
+                        .client
+                        .post(&url)
+                        .headers(headers.clone())
+                        .multipart(form)
+                        .timeout(timeout)
+                        .send()
+                        .await?;
+                    res.error_for_status()
+                        .map_err(|err| Box::new(err) as Box<dyn Error + Send + Sync>)
+                },
+                is_retry_err,
+            )
             .await?;
 
         if !res.status().is_success() {
@@ -126,7 +140,7 @@ impl ASRClient {
         )?;
         let url = format!("{}/status.service/status/{}", self.url, id);
 
-        let policy = RetryPolicy::exponential(Duration::from_millis(100))
+        let policy = RetryPolicy::exponential(Duration::from_secs(1))
             .with_max_retries(3)
             .with_jitter(true);
 
@@ -134,15 +148,17 @@ impl ASRClient {
             .retry_if(
                 || async {
                     log::info!("call: {}", url);
-                    self
+                    let res = self
                         .client
                         .get(&url)
                         .headers(headers.clone()) // Clone headers for each retry
                         .timeout(Duration::from_secs(10))
                         .send()
-                        .await
+                        .await?;
+                    res.error_for_status()
+                        .map_err(|err| Box::new(err) as Box<dyn Error + Send + Sync>)
                 },
-                reqwest::Error::is_status,
+                is_retry_err,
             )
             .await?;
         if res.status().is_success() {
@@ -158,6 +174,40 @@ impl ASRClient {
             Err(format!("Request failed with status: {}\n{}", status, body).into())
         }
     }
+}
+
+#[allow(clippy::borrowed_box)]
+fn is_retry_err(err: &Box<dyn Error + Send + Sync>) -> bool {
+    log::info!("retry? {:?}", err);
+    if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
+        log::info!("reqwest err");
+        if reqwest_err.is_timeout() {
+            log::info!("timeout");
+            return true;
+        }
+        if reqwest_err.is_status() {
+            log::info!("status");
+            if let Some(status) = reqwest_err.status() {
+                log::info!("status code {}", status);
+                if status.is_server_error() {
+                    log::info!("retry");
+                    return true;
+                }
+                if status == 429 || status == 404 {
+                    log::info!("retry");
+                    return true;
+                }
+            }
+        }
+    }
+    if let Some(io_err) = err.downcast_ref::<std::io::Error>() {
+        log::info!("io err");
+        if io_err.kind() == std::io::ErrorKind::TimedOut {
+            return true;
+        }
+    }
+    log::error!("don't retry");
+    false
 }
 
 fn get_timeout(file_size: u64) -> Duration {

@@ -2,7 +2,8 @@
 log?=INFO
 ###############################################################################
 run/worker:
-	RUST_LOG=$(log) cargo run --bin worker -- --base-dir=./test -w=2
+	RUST_LOG=$(log) cargo run --bin worker -- --base-dir=./test -w=2 \
+		--asr-url=https://atpazinimas.intelektika.lt/ausis
 .PHONY: run/worker
 ###############################################################################
 build/local: 

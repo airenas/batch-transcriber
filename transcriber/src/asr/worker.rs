@@ -19,12 +19,15 @@ use crate::{
     postgres::queue::PQueue,
 };
 
+use super::client::ASRClient;
+
 pub struct Worker {
     pgmq: PQueue,
     // filer: Filer,
     id: i32,
     ct: CancellationToken,
     pool: Pool,
+    asr_client: ASRClient,
 }
 
 impl Worker {
@@ -34,6 +37,7 @@ impl Worker {
         id: i32,
         ct: CancellationToken,
         pool: Pool,
+        asr_client: ASRClient,
     ) -> Result<Self, Box<dyn Error>> {
         log::info!("Init Worker");
         Ok(Self {
@@ -42,6 +46,7 @@ impl Worker {
             id,
             ct,
             pool,
+            asr_client,
         })
     }
 
@@ -94,7 +99,7 @@ impl Worker {
         let ct = CancellationToken::new();
         let job_handle: JoinHandle<()> = self.keep_in_progress(ct.clone(), msg.msg_id);
 
-        if item.external_id == "" {
+        if item.external_id.is_empty() {
             let external_id = self.upload(&msg_asr).await?;
             log::info!("Uploaded: {}", external_id);
             self.update_external_id(msg_asr.id.clone(), external_id.clone())
@@ -170,7 +175,7 @@ impl Worker {
 
     fn keep_in_progress(&self, cl: CancellationToken, q_id: i64) -> JoinHandle<()> {
         let q = self.pgmq.clone();
-        return tokio::spawn(async move {
+        tokio::spawn(async move {
             log::info!("start loop...");
             loop {
                 tokio::select! {
@@ -186,17 +191,28 @@ impl Worker {
                 }
             }
             log::info!("exit loop...");
-        });
+        })
     }
 
     async fn upload(&self, msg_asr: &ASRMessage) -> Result<String, Box<dyn Error + Send + Sync>> {
-        Ok("11".to_string())
+        let file_path = format!("{}/working/{}", msg_asr.base_dir, msg_asr.file);
+        self.asr_client.upload(file_path.as_str()).await
     }
 
     async fn get_status(
         &self,
         ext_id: &str,
     ) -> Result<(bool, String), Box<dyn Error + Send + Sync>> {
+        let res = self.asr_client.status(ext_id).await?;
+        log::info!("status: {:?}", res.status);
+        if let Some(status) = res.status {
+            if status == "COMPLETED" {
+                return Ok((true, "".to_string()));
+            }
+        }
+        if let Some(err_code) = res.error_code {
+            return Ok((true, format!("{}\n{}", err_code, res.error.unwrap_or_else(||"".to_string())).to_string()));
+        }
         Ok((false, "".to_string()))
     }
 

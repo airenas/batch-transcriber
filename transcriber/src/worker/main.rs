@@ -4,6 +4,7 @@ use std::error::Error;
 use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
+use transcriber::asr::client::ASRClient;
 use transcriber::asr::worker;
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
@@ -26,12 +27,26 @@ struct Args {
     /// Background worker count
     #[arg(short, long, env, default_value = "1")]
     worker_count: i32,
+
+    /// ASR URL
+    #[arg(long, env)]
+    asr_url: String,
+
+    /// ASR auth key
+    #[arg(long, env, default_value = "")]
+    asr_auth_key: String,
+
+    /// ASR recognizer
+    #[arg(long, env, default_value = "ben")]
+    asr_recognizer: String,
 }
 
 async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
     log::info!("Starting file adder");
     log::info!("Version      : {}", env!("CARGO_APP_VERSION"));
     log::info!("Base dir     : {}", args.base_dir);
+    log::info!("ASR URL      : {}", args.asr_url);
+    log::info!("ASR Model    : {}", args.asr_recognizer);
 
     let f = Filer::new(args.base_dir);
     log::info!("Connecting to postgres...");
@@ -39,13 +54,21 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
 
     let manager = Manager::new(args.postgres_url, Runtime::Tokio1);
     let pool = Pool::builder(manager).max_size(8).build()?;
+    let asr_client = ASRClient::new(&args.asr_url, &args.asr_auth_key, &args.asr_recognizer)?;
     let token = CancellationToken::new();
 
     let tracker = TaskTracker::new();
 
     for i in 0..args.worker_count {
-        let worker =
-            worker::Worker::new(pq.clone(), f.clone(), i, token.clone(), pool.clone()).await?;
+        let worker = worker::Worker::new(
+            pq.clone(),
+            f.clone(),
+            i,
+            token.clone(),
+            pool.clone(),
+            asr_client.clone(),
+        )
+        .await?;
         tracker.spawn(async move {
             if let Err(e) = worker.run().await {
                 log::error!("{}", e);

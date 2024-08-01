@@ -10,6 +10,7 @@ pub struct ASRMessage {
 #[derive(Serialize, Debug, Deserialize, Clone)]
 pub struct ResultMessage {
     pub id: String,
+    pub external_id: String,
     pub finished: bool,
     pub file: String,
     pub base_dir: String,

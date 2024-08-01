@@ -1,4 +1,5 @@
-use crate::{data::api::ASRMessage, QSender};
+use crate::{data::api::ASRMessage, QProcessor, QSender};
+use anyhow::Context;
 use async_trait::async_trait;
 use serde::Serialize;
 use std::{error::Error, future::Future, time::Duration};
@@ -39,16 +40,19 @@ impl PQueue {
         log::info!("updated: {:?}", message);
         Ok(())
     }
+}
 
-    pub async fn process<F, Fut>(&self, func: F) -> Result<bool, Box<dyn Error + Send + Sync>>
+#[async_trait]
+impl<T: 'static + for<'de> serde::Deserialize<'de> + std::fmt::Debug> QProcessor<T> for PQueue
+where
+    T: Send + Sync,
+{
+    async fn process<F, Fut>(&self, func: F) -> anyhow::Result<bool>
     where
-        F: Fn(Message<ASRMessage>) -> Fut,
-        Fut: Future<Output = Result<bool, Box<dyn Error + Send + Sync>>>,
+        F: Fn(Message<T>) -> Fut + Send,
+        Fut: Future<Output = anyhow::Result<bool>> + Send,
     {
-        let message: Option<Message<ASRMessage>> = self
-            .pgmq
-            .read::<ASRMessage>(&self.queue_name, Some(30))
-            .await?;
+        let message: Option<Message<T>> = self.pgmq.read::<T>(&self.queue_name, Some(30)).await?;
         match message {
             Some(msg) => {
                 log::info!("Got msg: {:?}", msg);
@@ -73,17 +77,17 @@ impl PQueue {
 }
 
 #[async_trait]
-impl<T: 'static> QSender<T> for PQueue
+impl<T: 'static + std::fmt::Debug> QSender<T> for PQueue
 where
     T: Serialize + Send + Sync,
 {
-    async fn send(&self, message: T) -> Result<(), Box<dyn Error + Send + Sync>> {
-        log::info!("Sending msg");
+    async fn send(&self, message: T) -> anyhow::Result<()> {
+        log::info!("Sending msg {:?}", message);
         let id: i64 = self
             .pgmq
             .send(&self.queue_name, &message)
             .await
-            .map_err(|err| format!("Can't send: {}", err))?;
+            .with_context(|| "Can't send")?;
         log::info!("sent: {}", id);
         Ok(())
     }

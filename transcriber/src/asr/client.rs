@@ -38,7 +38,11 @@ pub struct ASRClient {
 }
 
 impl ASRClient {
-    pub fn new(url: &str, auth_key: &str, model: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
+    pub fn new(
+        url: &str,
+        auth_key: &str,
+        model: &str,
+    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
         log::info!("Init ASRClient");
         log::info!("URL: {url}");
         let client = reqwest::Client::builder()
@@ -53,7 +57,7 @@ impl ASRClient {
         })
     }
 
-    pub async fn upload(&self, file_path: &str) -> Result<String, Box<dyn Error + Send + Sync>> {
+    pub async fn upload(&self, file_path: &str) -> anyhow::Result<String> {
         log::info!("Send file to ASR: {}", file_path);
         let metadata = fs::metadata(file_path)?;
         let file_size = metadata.len();
@@ -120,15 +124,17 @@ impl ASRClient {
                 },
                 is_retry_err,
             )
-            .await?;
+            .await
+            .map_err(anyhow::Error::msg)?;
 
         if !res.status().is_success() {
             let status = res.status();
             let body = res.text().await.unwrap_or("can't read body".into());
-            return Err(format!("Request failed with status: {}\n{}", status, body).into());
+            return Err(format!("Request failed with status: {}\n{}", status, body))
+                .map_err(anyhow::Error::msg);
         }
         let parsed_json: UploadResponse = res.json().await?;
-        Ok::<String, Box<dyn Error + Send + Sync>>(parsed_json.id)
+        Ok(parsed_json.id)
     }
 
     pub async fn status(&self, id: &str) -> Result<StatusResponse, Box<dyn Error + Send + Sync>> {
@@ -172,6 +178,49 @@ impl ASRClient {
             let status = res.status();
             let body = res.text().await.unwrap_or("can't read body".into());
             Err(format!("Request failed with status: {}\n{}", status, body).into())
+        }
+    }
+
+    pub async fn result(&self, id: &str, file_name: &str) -> anyhow::Result<String> {
+        log::info!("load file: {}, {}", id, file_name);
+        let mut headers = HeaderMap::new();
+        headers.try_insert(
+            HeaderName::from_static("accept"),
+            HeaderValue::from_str("text/plain")?,
+        )?;
+        let url = format!("{}/result.service/result/{}/{}", self.url, id, file_name);
+
+        let policy = RetryPolicy::exponential(Duration::from_secs(1))
+            .with_max_retries(3)
+            .with_jitter(true);
+
+        let res = policy
+            .retry_if(
+                || async {
+                    log::info!("call: {}", url);
+                    let res = self
+                        .client
+                        .get(&url)
+                        .headers(headers.clone())
+                        .timeout(Duration::from_secs(15))
+                        .send()
+                        .await?;
+                    res.error_for_status()
+                        .map_err(|err| Box::new(err) as Box<dyn Error + Send + Sync>)
+                },
+                is_retry_err,
+            )
+            .await
+            .map_err(anyhow::Error::msg)?;
+        if res.status().is_success() {
+            log::info!("call ok");
+            let content = res.text().await?;
+            Ok(content)
+        } else {
+            log::info!("call failed");
+            let status = res.status();
+            let body = res.text().await.unwrap_or("can't read body".into());
+            Err(anyhow::anyhow!("Request failed with status: {}\n{}", status, body))
         }
     }
 }

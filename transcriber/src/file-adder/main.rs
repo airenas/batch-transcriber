@@ -1,10 +1,10 @@
 use std::error::Error;
-use transcriber::data::api::ASRMessage;
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
+use transcriber::{data::api::ASRMessage, DIR_WORKING};
 
 use clap::Parser;
-use transcriber::{QSender, INPUT_QUEUE};
+use transcriber::{QSender, DIR_INCOMMING, INPUT_QUEUE};
 use ulid::Ulid;
 // use super:: lib::filer::Filer;
 
@@ -40,7 +40,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
     let sender = Box::new(pq) as Box<dyn QSender<ASRMessage>>;
     if !args.only_msg {
         let f = Filer::new(args.base_dir.clone());
-        f.move_working(args.file.as_str())?;
+        f.move_to(&args.file, DIR_INCOMMING, DIR_WORKING)?;
     } else {
         log::warn!("Skip copying file");
     }

@@ -5,7 +5,7 @@ use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use transcriber::asr::client::ASRClient;
-use transcriber::asr::worker;
+use transcriber::asr::{res_worker, worker};
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
 use transcriber::{INPUT_QUEUE, RESULT_QUEUE};
@@ -63,20 +63,26 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
 
     for i in 0..args.worker_count {
         let worker = worker::Worker::new(
-            pq.clone(),
-            f.clone(),
             i,
             token.clone(),
             pool.clone(),
             asr_client.clone(),
             Box::new(pq_res.clone()),
-        ) .await?;
+            pq.clone(),
+        )
+        .await?;
         tracker.spawn(async move {
             if let Err(e) = worker.run().await {
                 log::error!("{}", e);
             }
         });
     }
+    let worker = res_worker::Worker::new(token.clone(), asr_client.clone(), pq_res, f).await?;
+    tracker.spawn(async move {
+        if let Err(e) = worker.run().await {
+            log::error!("{}", e);
+        }
+    });
 
     tracker.close();
 

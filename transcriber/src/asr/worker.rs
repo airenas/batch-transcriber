@@ -11,23 +11,21 @@ use tokio::{select, task::JoinHandle, time::sleep};
 use tokio_util::sync::CancellationToken;
 
 use crate::data::api::ResultMessage;
-use crate::QSender;
+use crate::postgres::queue::PQueue;
 use crate::{
     data::api::ASRMessage,
-    filer::file::Filer,
     model::{
         models::WorkData,
         schema::{self},
     },
-    postgres::queue::PQueue,
 };
+use crate::{QProcessor, QSender};
 
 use super::client::ASRClient;
 
 pub struct Worker {
     result_queue: Box<dyn QSender<ResultMessage> + Send + Sync>,
-    pgmq: PQueue,
-    // filer: Filer,
+    input_queue: PQueue,
     id: i32,
     ct: CancellationToken,
     pool: Pool,
@@ -36,18 +34,16 @@ pub struct Worker {
 
 impl Worker {
     pub async fn new(
-        pgmq: PQueue,
-        _filer: Filer,
         id: i32,
         ct: CancellationToken,
         pool: Pool,
         asr_client: ASRClient,
         result_queue: Box<dyn QSender<ResultMessage> + Send + Sync>,
+        input_queue: PQueue,
     ) -> Result<Self, Box<dyn Error + Send + Sync>> {
         log::info!("Init Worker");
         Ok(Self {
-            pgmq,
-            // filer,
+            input_queue,
             id,
             ct,
             pool,
@@ -61,7 +57,7 @@ impl Worker {
         loop {
             let mut was: bool = false;
             let res = self
-                .pgmq
+                .input_queue
                 .process(|msg: Message<ASRMessage>| async move { self.process_msg(msg).await })
                 .await;
             match res {
@@ -90,16 +86,24 @@ impl Worker {
         Ok(())
     }
 
-    pub async fn process_msg(
-        &self,
-        msg: Message<ASRMessage>,
-    ) -> Result<bool, Box<dyn Error + Send + Sync>> {
+    pub async fn process_msg(&self, msg: Message<ASRMessage>) -> anyhow::Result<bool> {
         log::info!("Process {:?}", msg);
         let msg_asr = msg.message;
         if msg.read_ct > 3 {
             log::warn!("Max retries reached");
-            self.send_status(&msg_asr, false, "max retries reached")
-                .await?;
+
+            let mut external_id = "".to_string();
+            if let Ok(item) = self.load_item(msg_asr.clone()).await {
+                external_id = item.external_id;
+            }
+
+            // don't fail here, just try send status message
+            if let Err(err) = self
+                .send_status(&msg_asr, false, "max retries reached", &external_id)
+                .await
+            {
+                log::error!("can't send status message: {}", err);
+            }
             return Ok(true);
         }
         let mut item = self.load_item(msg_asr.clone()).await?;
@@ -115,8 +119,9 @@ impl Worker {
             item.external_id = external_id;
         }
 
-        let (finished, err) = self.check_status(&item).await?;
-        self.send_status(&msg_asr, finished, err.as_str()).await?;
+        let (finished, err) = self.check_status(&item).await.map_err(anyhow::Error::msg)?;
+        self.send_status(&msg_asr, finished, &err, &item.external_id)
+            .await?;
         log::info!("finish: {}", msg.msg_id);
         log::debug!("sending cancel signal to update job...");
         ct.cancel();
@@ -125,10 +130,7 @@ impl Worker {
         Ok(true)
     }
 
-    async fn load_item(
-        &self,
-        msg_asr: ASRMessage,
-    ) -> Result<WorkData, Box<dyn Error + Send + Sync>> {
+    async fn load_item(&self, msg_asr: ASRMessage) -> anyhow::Result<WorkData> {
         let conn = self.pool.get().await?;
         let result = conn
             .interact(move |conn| {
@@ -142,7 +144,7 @@ impl Worker {
                         .optional()?;
                     if let Some(v) = res {
                         log::info!("Found: {}", v.id);
-                        return Ok::<WorkData, Box<dyn Error + Send + Sync>>(v);
+                        return Ok::<WorkData, anyhow::Error>(v);
                     }
 
                     let res: WorkData = diesel::insert_into(work_data)
@@ -158,15 +160,12 @@ impl Worker {
                 })
             })
             .await
-            .map_err(|err| format!("can't insert/get work data: {}", err))??;
+            .map_err(|err| format!("can't insert/get work data: {}", err))
+            .map_err(anyhow::Error::msg)??;
         Ok(result)
     }
 
-    async fn update_external_id(
-        &self,
-        id_v: String,
-        external_id_v: String,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    async fn update_external_id(&self, id_v: String, external_id_v: String) -> anyhow::Result<()> {
         let conn = self.pool.get().await?;
         _ = conn
             .interact(move |conn| {
@@ -177,12 +176,13 @@ impl Worker {
                     .execute(conn)
             })
             .await
-            .map_err(|err| format!("can't update work data: {}", err))??;
+            .map_err(|err| format!("can't update work data: {}", err))
+            .map_err(anyhow::Error::msg)??;
         Ok(())
     }
 
     fn keep_in_progress(&self, cl: CancellationToken, q_id: i64) -> JoinHandle<()> {
-        let q = self.pgmq.clone();
+        let q = self.input_queue.clone();
         tokio::spawn(async move {
             log::info!("start loop...");
             loop {
@@ -202,7 +202,7 @@ impl Worker {
         })
     }
 
-    async fn upload(&self, msg_asr: &ASRMessage) -> Result<String, Box<dyn Error + Send + Sync>> {
+    async fn upload(&self, msg_asr: &ASRMessage) -> anyhow::Result<String> {
         let file_path = format!("{}/working/{}", msg_asr.base_dir, msg_asr.file);
         self.asr_client.upload(file_path.as_str()).await
     }
@@ -237,7 +237,8 @@ impl Worker {
         orig: &ASRMessage,
         finished: bool,
         error: &str,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        external_id_v: &str,
+    ) -> anyhow::Result<()> {
         log::info!(
             "send finished: {}, id: {}, err: {}",
             finished,
@@ -249,6 +250,7 @@ impl Worker {
             file: orig.file.clone(),
             base_dir: orig.base_dir.clone(),
             finished,
+            external_id: external_id_v.to_string(),
             error: if error.is_empty() {
                 None
             } else {

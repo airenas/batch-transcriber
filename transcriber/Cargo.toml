@@ -19,6 +19,7 @@ chrono = "0.4.38"
 deadpool-diesel = { version = "0.6.1", features = ["postgres"] }
 reqwest = { version = "0.12.5", features = ["multipart", "stream", "json"] }
 again = { version = "0.1.2", features = ["rand"] }
+rand = "0.8.5"
 
 [dev-dependencies]
 test-case = "3.3.1"

@@ -8,6 +8,7 @@ use diesel::RunQueryDsl;
 use pgmq::Message;
 use tokio::{select, task::JoinHandle, time::sleep};
 use tokio_util::sync::CancellationToken;
+use rand::Rng;
 
 use crate::{
     data::api::ASRMessage,
@@ -97,6 +98,7 @@ impl Worker {
         let msg_asr = msg.message;
         let mut item = self.load_item(msg_asr.clone()).await?;
         let ct = CancellationToken::new();
+        let _st_dg = ct.clone().drop_guard();
         let job_handle: JoinHandle<()> = self.keep_in_progress(ct.clone(), msg.msg_id);
 
         if item.external_id.is_empty() {
@@ -233,8 +235,12 @@ impl Worker {
             if start_time.elapsed() >= wait_duration {
                 return Err("status wait timeout".into());
             }
+            let jitter = {
+                let mut rng = rand::thread_rng();
+                Duration::from_millis(rng.gen_range(0..=5000))
+            };
             tokio::select! {
-                _ = sleep(Duration::from_secs(10)) => {}
+                _ = sleep(Duration::from_secs(8) + jitter) => {}
                 _ = self.ct.cancelled() => {
                     return Err("cancelled".into());
                 }

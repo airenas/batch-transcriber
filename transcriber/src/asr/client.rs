@@ -38,7 +38,7 @@ pub struct ASRClient {
 }
 
 impl ASRClient {
-    pub fn new(url: &str, auth_key: &str, model: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn new(url: &str, auth_key: &str, model: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
         log::info!("Init ASRClient");
         log::info!("URL: {url}");
         let client = reqwest::Client::builder()

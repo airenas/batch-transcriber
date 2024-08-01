@@ -1,8 +1,9 @@
-use crate::{data::api::ASRMessage};
+use crate::{data::api::ASRMessage, QSender};
+use async_trait::async_trait;
+use serde::Serialize;
 use std::{error::Error, future::Future, time::Duration};
 
 use pgmq::{Message, PGMQueue};
-use ulid::Ulid;
 
 #[derive(Clone)]
 pub struct PQueue {
@@ -11,12 +12,12 @@ pub struct PQueue {
 }
 
 impl PQueue {
-    pub async fn new(p_url: String) -> Result<Self, Box<dyn Error>> {
-        log::info!("Init PGMQ");
-        let queue: PGMQueue = PGMQueue::new(p_url)
+    pub async fn new(p_url: &str, queue_name: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        log::info!("Init PGMQ, with name: {queue_name}");
+        let queue: PGMQueue = PGMQueue::new(p_url.to_string())
             .await
             .map_err(|err| format!("Can't connect to postgres: {}", err))?;
-        let my_queue = "asr_queue".to_owned();
+        let my_queue = queue_name.to_string();
         queue
             .create(&my_queue)
             .await
@@ -27,29 +28,13 @@ impl PQueue {
         })
     }
 
-    pub async fn add_job(&self, file: &str, base_dir: &str) -> Result<(), Box<dyn Error>> {
-        let ulid = Ulid::new();
-        let message = ASRMessage {
-            file: file.to_string(),
-            id: ulid.to_string(),
-            base_dir: base_dir.to_string(),
-        };
-        log::info!("Sending msg: {:?}", message);
-        let id: i64 = self
-            .pgmq
-            .send(&self.queue_name, &message)
-            .await
-            .map_err(|err| format!("Can't send: {}", err))?;
-        log::info!("send: {}", id);
-        Ok(())
-    }
-
     pub async fn mark_working(&self, id: i64) -> Result<(), Box<dyn Error>> {
         log::info!("Updating msg: {:?}", id);
         let vt = chrono::Utc::now() + Duration::from_secs(60);
         let message: Option<Message<ASRMessage>> = self
             .pgmq
-            .set_vt(&self.queue_name, id, vt).await
+            .set_vt(&self.queue_name, id, vt)
+            .await
             .map_err(|err| format!("Can't set: {}", err))?;
         log::info!("updated: {:?}", message);
         Ok(())
@@ -79,13 +64,27 @@ impl PQueue {
                     Err(e) => {
                         log::error!("Error: {}", e);
                     }
-                    
                 }
                 Ok(true)
             }
-            None => {
-                Ok(false)
-            }
+            None => Ok(false),
         }
+    }
+}
+
+#[async_trait]
+impl<T: 'static> QSender<T> for PQueue
+where
+    T: Serialize + Send + Sync,
+{
+    async fn send(&self, message: T) -> Result<(), Box<dyn Error + Send + Sync>> {
+        log::info!("Sending msg");
+        let id: i64 = self
+            .pgmq
+            .send(&self.queue_name, &message)
+            .await
+            .map_err(|err| format!("Can't send: {}", err))?;
+        log::info!("sent: {}", id);
+        Ok(())
     }
 }

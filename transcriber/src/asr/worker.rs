@@ -6,10 +6,12 @@ use diesel::query_dsl::methods::FilterDsl;
 use diesel::ExpressionMethods;
 use diesel::RunQueryDsl;
 use pgmq::Message;
+use rand::Rng;
 use tokio::{select, task::JoinHandle, time::sleep};
 use tokio_util::sync::CancellationToken;
-use rand::Rng;
 
+use crate::data::api::ResultMessage;
+use crate::QSender;
 use crate::{
     data::api::ASRMessage,
     filer::file::Filer,
@@ -23,6 +25,7 @@ use crate::{
 use super::client::ASRClient;
 
 pub struct Worker {
+    result_queue: Box<dyn QSender<ResultMessage> + Send + Sync>,
     pgmq: PQueue,
     // filer: Filer,
     id: i32,
@@ -39,7 +42,8 @@ impl Worker {
         ct: CancellationToken,
         pool: Pool,
         asr_client: ASRClient,
-    ) -> Result<Self, Box<dyn Error>> {
+        result_queue: Box<dyn QSender<ResultMessage> + Send + Sync>,
+    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
         log::info!("Init Worker");
         Ok(Self {
             pgmq,
@@ -48,6 +52,7 @@ impl Worker {
             ct,
             pool,
             asr_client,
+            result_queue,
         })
     }
 
@@ -90,12 +95,13 @@ impl Worker {
         msg: Message<ASRMessage>,
     ) -> Result<bool, Box<dyn Error + Send + Sync>> {
         log::info!("Process {:?}", msg);
+        let msg_asr = msg.message;
         if msg.read_ct > 3 {
             log::warn!("Max retries reached");
-            self.send_status(false, "max retries reached").await?;
+            self.send_status(&msg_asr, false, "max retries reached")
+                .await?;
             return Ok(true);
         }
-        let msg_asr = msg.message;
         let mut item = self.load_item(msg_asr.clone()).await?;
         let ct = CancellationToken::new();
         let _st_dg = ct.clone().drop_guard();
@@ -110,7 +116,7 @@ impl Worker {
         }
 
         let (finished, err) = self.check_status(&item).await?;
-        self.send_status(finished, err.as_str()).await?;
+        self.send_status(&msg_asr, finished, err.as_str()).await?;
         log::info!("finish: {}", msg.msg_id);
         log::debug!("sending cancel signal to update job...");
         ct.cancel();
@@ -213,14 +219,43 @@ impl Worker {
             }
         }
         if let Some(err_code) = res.error_code {
-            return Ok((true, format!("{}\n{}", err_code, res.error.unwrap_or_else(||"".to_string())).to_string()));
+            return Ok((
+                true,
+                format!(
+                    "{}\n{}",
+                    err_code,
+                    res.error.unwrap_or_else(|| "".to_string())
+                )
+                .to_string(),
+            ));
         }
         Ok((false, "".to_string()))
     }
 
-    async fn send_status(&self, ok: bool, error: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
-        log::info!("send status: {} {}", ok, error);
-        Ok(())
+    async fn send_status(
+        &self,
+        orig: &ASRMessage,
+        finished: bool,
+        error: &str,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        log::info!(
+            "send finished: {}, id: {}, err: {}",
+            finished,
+            orig.id,
+            error
+        );
+        let status = ResultMessage {
+            id: orig.id.clone(),
+            file: orig.file.clone(),
+            base_dir: orig.base_dir.clone(),
+            finished,
+            error: if error.is_empty() {
+                None
+            } else {
+                Some(error.to_string())
+            },
+        };
+        self.result_queue.send(status).await
     }
 
     async fn check_status(

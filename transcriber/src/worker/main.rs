@@ -8,6 +8,7 @@ use transcriber::asr::client::ASRClient;
 use transcriber::asr::worker;
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
+use transcriber::{INPUT_QUEUE, RESULT_QUEUE};
 
 use clap::Parser;
 // use super:: lib::filer::Filer;
@@ -41,7 +42,7 @@ struct Args {
     asr_recognizer: String,
 }
 
-async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
+async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
     log::info!("Starting file adder");
     log::info!("Version      : {}", env!("CARGO_APP_VERSION"));
     log::info!("Base dir     : {}", args.base_dir);
@@ -50,7 +51,8 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
 
     let f = Filer::new(args.base_dir);
     log::info!("Connecting to postgres...");
-    let pq = PQueue::new(args.postgres_url.clone()).await?;
+    let pq = PQueue::new(&args.postgres_url, INPUT_QUEUE).await?;
+    let pq_res = PQueue::new(&args.postgres_url, RESULT_QUEUE).await?;
 
     let manager = Manager::new(args.postgres_url, Runtime::Tokio1);
     let pool = Pool::builder(manager).max_size(8).build()?;
@@ -67,8 +69,8 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
             token.clone(),
             pool.clone(),
             asr_client.clone(),
-        )
-        .await?;
+            Box::new(pq_res.clone()),
+        ) .await?;
         tracker.spawn(async move {
             if let Err(e) = worker.run().await {
                 log::error!("{}", e);
@@ -96,7 +98,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     env_logger::init();
     let args = Args::parse();
     if let Err(e) = main_int(args).await {

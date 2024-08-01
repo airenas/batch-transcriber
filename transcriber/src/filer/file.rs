@@ -11,7 +11,7 @@ impl Filer {
         Self { base_dir }
     }
 
-    pub fn move_working(&self, file: &str) -> Result<(), Box<dyn Error>> {
+    pub fn move_working(&self, file: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut source_path = PathBuf::from(self.base_dir.as_str());
         source_path.extend(&["incoming", file]);
         let f = source_path

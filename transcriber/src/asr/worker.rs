@@ -7,11 +7,12 @@ use diesel::ExpressionMethods;
 use diesel::RunQueryDsl;
 use pgmq::Message;
 use rand::Rng;
-use tokio::{select, task::JoinHandle, time::sleep};
+use tokio::{task::JoinHandle, time::sleep};
 use tokio_util::sync::CancellationToken;
 
 use crate::data::api::ResultMessage;
 use crate::postgres::queue::PQueue;
+use crate::QSender;
 use crate::{
     data::api::ASRMessage,
     model::{
@@ -19,7 +20,6 @@ use crate::{
         schema::{self},
     },
 };
-use crate::{QProcessor, QSender};
 
 use super::client::ASRClient;
 
@@ -52,38 +52,14 @@ impl Worker {
         })
     }
 
-    pub async fn run(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        log::info!("Run worker {}", self.id);
-        loop {
-            let mut was: bool = false;
-            let res = self
-                .input_queue
-                .process(|msg: Message<ASRMessage>| async move { self.process_msg(msg).await })
-                .await;
-            match res {
-                Ok(v) => {
-                    was = v;
-                }
-                Err(e) => {
-                    log::error!("{}", e);
-                }
-            }
-            if self.ct.is_cancelled() {
-                log::info!("Worker {} cancelled", self.id);
-                break;
-            }
-            if !was {
-                select! {
-                    _ = self.ct.cancelled() => {
-                        log::info!("Worker {} cancelled", self.id);
-                        break;
-                    }
-                    _ = sleep(Duration::from_secs(1)) => { }
-                }
-            }
-        }
-        log::info!("Stop worker: {}", self.id);
-        Ok(())
+    pub async fn run(&self) -> anyhow::Result<()> {
+        crate::postgres::queue::run(
+            self.input_queue.clone(),
+            |msg: Message<ASRMessage>| async move { self.process_msg(msg).await },
+            self.ct.clone(),
+            format!("worker {}", self.id).as_str(),
+        )
+        .await
     }
 
     pub async fn process_msg(&self, msg: Message<ASRMessage>) -> anyhow::Result<bool> {

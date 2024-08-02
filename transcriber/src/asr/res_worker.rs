@@ -1,10 +1,9 @@
+use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::{error::Error, time::Duration};
 
 use crate::filer::file::Filer;
-use crate::{QProcessor, ASR_FILE_LAT, ASR_FILE_RES, DIR_FAILED, DIR_PROCESSED, DIR_WORKING};
+use crate::{ASR_FILE_LAT, ASR_FILE_RES, DIR_FAILED, DIR_PROCESSED, DIR_WORKING};
 use pgmq::Message;
-use tokio::{select, time::sleep};
 use tokio_util::sync::CancellationToken;
 
 use super::client::ASRClient;
@@ -34,38 +33,14 @@ impl Worker {
         })
     }
 
-    pub async fn run(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        log::info!("Run result worker");
-        loop {
-            let mut was: bool = false;
-            let res = self
-                .result_queue
-                .process(|msg: Message<ResultMessage>| async move { self.process_msg(msg).await })
-                .await;
-            match res {
-                Ok(v) => {
-                    was = v;
-                }
-                Err(e) => {
-                    log::error!("{}", e);
-                }
-            }
-            if self.ct.is_cancelled() {
-                log::info!("Result Worker cancelled");
-                break;
-            }
-            if !was {
-                select! {
-                    _ = self.ct.cancelled() => {
-                        log::info!("Result Worker cancelled");
-                        break;
-                    }
-                    _ = sleep(Duration::from_secs(1)) => { }
-                }
-            }
-        }
-        log::info!("Stop result worker");
-        Ok(())
+    pub async fn run(&self) -> anyhow::Result<()> {
+        crate::postgres::queue::run(
+            self.result_queue.clone(),
+            |msg: Message<ResultMessage>| async move { self.process_msg(msg).await },
+            self.ct.clone(),
+            "result worker",
+        )
+        .await
     }
 
     pub async fn process_msg(&self, msg: Message<ResultMessage>) -> anyhow::Result<bool> {
@@ -84,6 +59,7 @@ impl Worker {
             {
                 log::error!("Error processing result message: {}", err);
             }
+
             return Ok(true);
         }
         if !msg_asr.finished {

@@ -3,6 +3,8 @@ use anyhow::Context;
 use async_trait::async_trait;
 use serde::Serialize;
 use std::{error::Error, future::Future, time::Duration};
+use tokio::{select, time::sleep};
+use tokio_util::sync::CancellationToken;
 
 use pgmq::{Message, PGMQueue};
 
@@ -91,4 +93,50 @@ where
         log::info!("sent: {}", id);
         Ok(())
     }
+}
+
+pub async fn run<
+    T: 'static + for<'de> serde::Deserialize<'de> + std::fmt::Debug + Send + Sync,
+    F,
+    Fut,
+>(
+    queue: PQueue,
+    func: F,
+    ct: CancellationToken,
+    name: &str,
+) -> anyhow::Result<()>
+where
+    F: Fn(Message<T>) -> Fut + Send + Sync,
+    Fut: Future<Output = anyhow::Result<bool>> + Send,
+{
+    log::info!("Run: {}", name);
+    loop {
+        let mut was: bool = false;
+        let res = queue
+            .process(&func)
+            .await;
+        match res {
+            Ok(v) => {
+                was = v;
+            }
+            Err(e) => {
+                log::error!("{}", e);
+            }
+        }
+        if ct.is_cancelled() {
+            log::info!("cancelled: {}", name);
+            break;
+        }
+        if !was {
+            select! {
+                _ = ct.cancelled() => {
+                    log::info!("cancelled: {}", name);
+                    break;
+                }
+                _ = sleep(Duration::from_secs(1)) => { }
+            }
+        }
+    }
+    log::info!("Stop: {}", name);
+    Ok(())
 }

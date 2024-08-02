@@ -12,7 +12,7 @@ pub const INPUT_QUEUE: &str = "asr_input";
 pub const RESULT_QUEUE: &str = "asr_result";
 pub const CLEAN_QUEUE: &str = "asr_clean";
 
-pub const DIR_INCOMMING: &str = "incomming";
+pub const DIR_INCOMING: &str = "incoming";
 pub const DIR_WORKING: &str = "working";
 pub const DIR_PROCESSED: &str = "processed";
 pub const DIR_FAILED: &str = "failed";

@@ -4,7 +4,7 @@ use transcriber::postgres::queue::PQueue;
 use transcriber::{data::api::ASRMessage, DIR_WORKING};
 
 use clap::Parser;
-use transcriber::{QSender, DIR_INCOMMING, INPUT_QUEUE};
+use transcriber::{QSender, DIR_INCOMING, INPUT_QUEUE};
 use ulid::Ulid;
 // use super:: lib::filer::Filer;
 
@@ -28,7 +28,7 @@ struct Args {
     #[clap(long, short, action, env, default_value = "false")]
     only_msg: bool,
 
-    /// Send all files from incomming
+    /// Send all files from incoming
     #[arg(long, env, default_value = "false")]
     auto: bool,
 }
@@ -41,7 +41,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     if args.auto {
         log::info!(
             "Add all      : {}",
-            args.base_dir.clone() + "/" + DIR_INCOMMING
+            args.base_dir.clone() + "/" + DIR_INCOMING
         );
     } else {
     }
@@ -75,7 +75,7 @@ async fn add_file(
 ) -> anyhow::Result<i64> {
     log::info!("Add file     : {}", file);
     if !only_msg {
-        f.move_to(file, DIR_INCOMMING, DIR_WORKING)?;
+        f.move_to(file, DIR_INCOMING, DIR_WORKING)?;
     } else {
         log::warn!("Skip copying file");
     }
@@ -97,7 +97,7 @@ async fn add_files(
     only_msg: bool,
 ) -> anyhow::Result<i64> {
     let mut source_path = PathBuf::from(base_dir);
-    source_path.extend(&[DIR_INCOMMING]);
+    source_path.extend(&[DIR_INCOMING]);
     log::info!("checking dir     : {}", source_path.display());
     let mut res = 0;
     for entry in std::fs::read_dir(source_path)? {

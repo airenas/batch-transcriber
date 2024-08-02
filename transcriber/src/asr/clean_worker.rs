@@ -42,6 +42,10 @@ impl Worker {
             log::error!("Max retries reached {:?}", msg_asr);
             return Ok(true);
         }
+        if msg_asr.external_id.is_empty() {
+            log::debug!("Empty external_id");
+            return Ok(true);
+        }
         self.clean(&msg_asr.external_id).await?;
         log::info!("done: {}", msg.msg_id);
         Ok(true)

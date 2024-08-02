@@ -75,7 +75,7 @@ impl Worker {
 
             // don't fail here, just try send status message
             if let Err(err) = self
-                .send_status(&msg_asr, false, "max retries reached", &external_id)
+                .send_status(&msg_asr, true, "max retries reached", &external_id)
                 .await
             {
                 log::error!("can't send status message: {}", err);

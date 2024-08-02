@@ -1,4 +1,7 @@
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone)]
 pub struct Filer {
@@ -8,7 +11,9 @@ pub struct Filer {
 impl Filer {
     pub fn new(base_dir: &str) -> Self {
         log::info!("Creating new Filer with base dir: {}", base_dir);
-        Self { base_dir: base_dir.to_string() }
+        Self {
+            base_dir: base_dir.to_string(),
+        }
     }
 
     pub fn save_txt(&self, f_name: &str, folder: &str, txt: &str) -> anyhow::Result<()> {
@@ -27,6 +32,19 @@ impl Filer {
         Ok(())
     }
 
+    pub fn non_existing_name(&self, f_name: &str, folder: &str) -> anyhow::Result<String> {
+        let mut i = 0;
+        loop {
+            let new_name = make_new_name(f_name, i);
+            let mut dest_path = PathBuf::from(self.base_dir.as_str());
+            dest_path.extend(&[folder, &new_name]);
+            if !dest_path.exists() {
+                return Ok(new_name);
+            }
+            i += 1;
+        }
+    }
+
     fn try_create_folder(&self, dest_path: &Path) -> anyhow::Result<()> {
         if let Some(dest_dir) = dest_path.parent() {
             if !dest_dir.exists() {
@@ -39,7 +57,13 @@ impl Filer {
         Ok(())
     }
 
-    pub fn move_to(&self, f_name: &str, dir_from: &str, dir_to: &str) -> anyhow::Result<()> {
+    pub fn move_to(
+        &self,
+        f_name: &str,
+        to_name: &str,
+        dir_from: &str,
+        dir_to: &str,
+    ) -> anyhow::Result<()> {
         let mut source_path = PathBuf::from(self.base_dir.as_str());
         source_path.extend(&[dir_from, f_name]);
         let f = source_path
@@ -51,7 +75,7 @@ impl Filer {
             return Err(anyhow::anyhow!("File {f} does not exist"));
         }
         let mut dest_path = PathBuf::from(self.base_dir.as_str());
-        dest_path.extend(&[dir_to, f_name]);
+        dest_path.extend(&[dir_to, to_name]);
         let f_new = dest_path
             .to_str()
             .ok_or("Failed to convert path to string")
@@ -68,5 +92,54 @@ impl Filer {
             .map_err(anyhow::Error::msg)?;
         log::info!("moved: {} -> {}", f, f_new);
         Ok(())
+    }
+}
+
+pub fn make_name(f_name: &str, ext: &str) -> String {
+    let path = Path::new(f_name);
+    let mut new_path = PathBuf::from(path);
+    let mut clean_ext = ext;
+    while clean_ext.starts_with('.') {
+        clean_ext = &clean_ext[1..]
+    }
+    new_path.set_extension(clean_ext);
+    new_path.to_string_lossy().into_owned()
+}
+
+pub fn make_new_name(f_name: &str, num: i32) -> String {
+    if num == 0 {
+        return f_name.to_string();
+    }
+    let path = Path::new(f_name);
+    let new_ext = match path.extension() {
+        Some(e) => {
+            format!("{}.{}", num, e.to_string_lossy())
+        }
+        None => format!("{}", num),
+    };
+    let mut new_path = PathBuf::from(path);
+    new_path.set_extension(new_ext);
+    new_path.to_string_lossy().into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case("document.wav", ".txt", "document.txt"; "change extension")]
+    #[test_case("archive.tar.gz", ".lat", "archive.tar.lat"; "Change last extension in multi-extension file")]
+    fn test_make_name(original: &str, new_ext: &str, expected: &str) {
+        let actual = make_name(original, new_ext);
+        assert_eq!(expected, actual);
+    }
+
+    #[test_case("document.wav", 0, "document.wav"; "same")]
+    #[test_case("archive.tar.gz", 0, "archive.tar.gz"; "several extensions")]
+    #[test_case("document.wav", 1, "document.1.wav"; "same add")]
+    #[test_case("archive.tar.gz", 20, "archive.tar.20.gz"; "several extensions add")]
+    fn test_make_new_name(original: &str, i: i32, expected: &str) {
+        let actual = make_new_name(original, i);
+        assert_eq!(expected, actual);
     }
 }

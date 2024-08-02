@@ -1,10 +1,10 @@
 use std::path::PathBuf;
-use transcriber::filer::file::Filer;
+use transcriber::filer::file::{make_name, Filer};
 use transcriber::postgres::queue::PQueue;
 use transcriber::{data::api::ASRMessage, DIR_WORKING};
 
 use clap::Parser;
-use transcriber::{QSender, DIR_INCOMING, INPUT_QUEUE};
+use transcriber::{QSender, DIR_INCOMING, INFO_EXTENSION, INPUT_QUEUE};
 use ulid::Ulid;
 // use super:: lib::filer::Filer;
 
@@ -71,15 +71,25 @@ async fn add_file(
     only_msg: bool,
 ) -> anyhow::Result<i64> {
     log::info!("Add file     : {}", file);
+    let mut new_f_name = file.to_string();
     if !only_msg {
-        f.move_to(file, DIR_INCOMING, DIR_WORKING)?;
+        new_f_name = f.non_existing_name(file, DIR_WORKING)?;
+        f.move_to(file, &new_f_name, DIR_INCOMING, DIR_WORKING)?;
+        if let Err(e) = f.move_to(
+            &make_name(file, INFO_EXTENSION),
+            &make_name(&new_f_name, INFO_EXTENSION),
+            DIR_INCOMING,
+            DIR_WORKING,
+        ) {
+            log::info!("No info file?: {}", e);
+        }
     } else {
         log::warn!("Skip copying file");
     }
     let ulid = Ulid::new();
     sender
         .send(ASRMessage {
-            file: file.to_string(),
+            file: new_f_name,
             id: ulid.to_string(),
             base_dir: base_dir.to_string(),
         })

@@ -16,6 +16,7 @@ pub const DIR_INCOMING: &str = "incoming";
 pub const DIR_WORKING: &str = "working";
 pub const DIR_PROCESSED: &str = "processed";
 pub const DIR_FAILED: &str = "failed";
+pub const INFO_EXTENSION: &str = ".meta";
 
 pub const ASR_FILE_RES: &str = "resultFinal.txt";
 pub const ASR_FILE_LAT: &str = "lat.restored.txt";

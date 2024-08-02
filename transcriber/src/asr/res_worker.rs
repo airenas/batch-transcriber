@@ -1,8 +1,9 @@
 use std::error::Error;
-use std::path::{Path, PathBuf};
 
-use crate::filer::file::Filer;
-use crate::{QSender, ASR_FILE_LAT, ASR_FILE_RES, DIR_FAILED, DIR_PROCESSED, DIR_WORKING};
+use crate::filer::file::{make_name, Filer};
+use crate::{
+    QSender, ASR_FILE_LAT, ASR_FILE_RES, DIR_FAILED, DIR_PROCESSED, DIR_WORKING, INFO_EXTENSION,
+};
 use pgmq::Message;
 use tokio_util::sync::CancellationToken;
 
@@ -81,13 +82,17 @@ impl Worker {
     async fn process_error(&self, msg_asr: &ResultMessage, err_str: &str) -> anyhow::Result<()> {
         log::info!("Process error {:?}", msg_asr);
         let f_name = msg_asr.file.clone();
+        let new_f_name = self.filer.non_existing_name(&f_name, DIR_FAILED)?;
         self.filer
-            .save_txt(&make_name(&f_name, ".err"), "failed", err_str)?;
-        self.filer.move_to(&f_name, DIR_WORKING, DIR_FAILED)?;
-        if let Err(e) = self
-            .filer
-            .move_to(&make_name(&f_name, ".info"), DIR_WORKING, DIR_FAILED)
-        {
+            .save_txt(&make_name(&new_f_name, ".err"), DIR_FAILED, err_str)?;
+        self.filer
+            .move_to(&f_name, &new_f_name, DIR_WORKING, DIR_FAILED)?;
+        if let Err(e) = self.filer.move_to(
+            &make_name(&f_name, INFO_EXTENSION),
+            &make_name(&new_f_name, INFO_EXTENSION),
+            DIR_WORKING,
+            DIR_FAILED,
+        ) {
             log::info!("No info file?: {}", e);
         }
         self.send_clean_msg(&msg_asr.external_id).await
@@ -98,15 +103,19 @@ impl Worker {
         let f_name = msg_asr.file.clone();
         let res = self.load_res(&msg_asr.external_id, ASR_FILE_RES).await?;
         let res_lat = self.load_res(&msg_asr.external_id, ASR_FILE_LAT).await?;
+        let new_f_name = self.filer.non_existing_name(&f_name, DIR_PROCESSED)?;
         self.filer
-            .save_txt(&make_name(&f_name, ".txt"), "processed", &res)?;
+            .save_txt(&make_name(&new_f_name, ".txt"), DIR_PROCESSED, &res)?;
         self.filer
-            .save_txt(&make_name(&f_name, ".lat"), "processed", &res_lat)?;
-        self.filer.move_to(&f_name, DIR_WORKING, DIR_PROCESSED)?;
-        if let Err(e) = self
-            .filer
-            .move_to(&make_name(&f_name, ".info"), DIR_WORKING, DIR_PROCESSED)
-        {
+            .save_txt(&make_name(&new_f_name, ".lat"), DIR_PROCESSED, &res_lat)?;
+        self.filer
+            .move_to(&f_name, &new_f_name, DIR_WORKING, DIR_PROCESSED)?;
+        if let Err(e) = self.filer.move_to(
+            &make_name(&f_name, INFO_EXTENSION),
+            &make_name(&new_f_name, INFO_EXTENSION),
+            DIR_WORKING,
+            DIR_PROCESSED,
+        ) {
             log::info!("No info file?: {}", e);
         }
         self.send_clean_msg(&msg_asr.external_id).await
@@ -122,29 +131,5 @@ impl Worker {
                 external_id: external_id.to_string(),
             })
             .await
-    }
-}
-
-fn make_name(f_name: &str, ext: &str) -> String {
-    let path = Path::new(f_name);
-    let mut new_path = PathBuf::from(path);
-    let mut clean_ext = ext;
-    while clean_ext.starts_with('.') {
-        clean_ext = &clean_ext[1..]
-    }
-    new_path.set_extension(clean_ext);
-    new_path.to_string_lossy().into_owned()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use test_case::test_case;
-
-    #[test_case("document.wav", ".txt", "document.txt"; "change extension")]
-    #[test_case("archive.tar.gz", ".lat", "archive.tar.lat"; "Change last extension in multi-extension file")]
-    fn test_make_name(original: &str, new_ext: &str, expected: &str) {
-        let actual = make_name(original, new_ext);
-        assert_eq!(expected, actual);
     }
 }

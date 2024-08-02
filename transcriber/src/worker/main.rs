@@ -49,7 +49,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
     log::info!("ASR URL      : {}", args.asr_url);
     log::info!("ASR Model    : {}", args.asr_recognizer);
 
-    let f = Filer::new(args.base_dir);
+    let f = Filer::new(&args.base_dir);
     log::info!("Connecting to postgres...");
     let pq = PQueue::new(&args.postgres_url, INPUT_QUEUE).await?;
     let pq_res = PQueue::new(&args.postgres_url, RESULT_QUEUE).await?;

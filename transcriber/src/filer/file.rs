@@ -6,9 +6,9 @@ pub struct Filer {
 }
 
 impl Filer {
-    pub fn new(base_dir: String) -> Self {
+    pub fn new(base_dir: &str) -> Self {
         log::info!("Creating new Filer with base dir: {}", base_dir);
-        Self { base_dir }
+        Self { base_dir: base_dir.to_string() }
     }
 
     pub fn save_txt(&self, f_name: &str, folder: &str, txt: &str) -> anyhow::Result<()> {

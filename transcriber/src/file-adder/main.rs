@@ -43,7 +43,6 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
             "Add all      : {}",
             args.base_dir.clone() + "/" + DIR_INCOMING
         );
-    } else {
     }
     log::info!("Connecting to postgres...");
     let pq = PQueue::new(&args.postgres_url, INPUT_QUEUE)
@@ -51,12 +50,10 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         .map_err(anyhow::Error::msg)?;
     let sender = Box::new(pq) as Box<dyn QSender<ASRMessage>>;
     let f = Filer::new(&args.base_dir);
-    let added = {
-        if args.auto {
-            add_files(&sender, &f, &args.base_dir, args.only_msg).await?
-        } else {
-            add_file(&sender, &f, &file, &args.base_dir, args.only_msg).await?
-        }
+    let added = if args.auto {
+        add_files(sender.as_ref(), &f, &args.base_dir, args.only_msg).await?
+    } else {
+        add_file(sender.as_ref(), &f, &file, &args.base_dir, args.only_msg).await?
     };
     if added == 0 {
         log::warn!("No files to transcribe");
@@ -67,7 +64,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
 }
 
 async fn add_file(
-    sender: &Box<dyn QSender<ASRMessage>>,
+    sender: &dyn QSender<ASRMessage>,
     f: &Filer,
     file: &str,
     base_dir: &str,
@@ -91,7 +88,7 @@ async fn add_file(
 }
 
 async fn add_files(
-    sender: &Box<dyn QSender<ASRMessage>>,
+    sender: &dyn QSender<ASRMessage>,
     f: &Filer,
     base_dir: &str,
     only_msg: bool,
@@ -108,7 +105,7 @@ async fn add_files(
                 let ext_str = ext.to_str().unwrap_or("").to_lowercase();
                 if ext_str == "mp3" || ext_str == "wav" || ext_str == "m4a" {
                     let file = path.file_name().unwrap().to_str().unwrap();
-                    res = res + add_file(sender, f, file, base_dir, only_msg).await?;
+                    res += add_file(sender, f, file, base_dir, only_msg).await?;
                 }
             }
         }

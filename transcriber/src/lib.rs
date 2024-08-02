@@ -10,6 +10,7 @@ pub mod postgres;
 
 pub const INPUT_QUEUE: &str = "asr_input";
 pub const RESULT_QUEUE: &str = "asr_result";
+pub const CLEAN_QUEUE: &str = "asr_clean";
 
 pub const DIR_INCOMMING: &str = "incomming";
 pub const DIR_WORKING: &str = "working";

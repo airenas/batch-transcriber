@@ -5,10 +5,10 @@ use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use transcriber::asr::client::ASRClient;
-use transcriber::asr::{res_worker, worker};
+use transcriber::asr::{clean_worker, res_worker, worker};
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
-use transcriber::{INPUT_QUEUE, RESULT_QUEUE};
+use transcriber::{CLEAN_QUEUE, INPUT_QUEUE, RESULT_QUEUE};
 
 use clap::Parser;
 // use super:: lib::filer::Filer;
@@ -53,6 +53,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
     log::info!("Connecting to postgres...");
     let pq = PQueue::new(&args.postgres_url, INPUT_QUEUE).await?;
     let pq_res = PQueue::new(&args.postgres_url, RESULT_QUEUE).await?;
+    let pq_clean = PQueue::new(&args.postgres_url, CLEAN_QUEUE).await?;
 
     let manager = Manager::new(args.postgres_url, Runtime::Tokio1);
     let pool = Pool::builder(manager).max_size(8).build()?;
@@ -77,7 +78,20 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
             }
         });
     }
-    let worker = res_worker::Worker::new(token.clone(), asr_client.clone(), pq_res, f).await?;
+    let worker = res_worker::Worker::new(
+        token.clone(),
+        asr_client.clone(),
+        pq_res,
+        f,
+        Box::new(pq_clean.clone()),
+    )
+    .await?;
+    tracker.spawn(async move {
+        if let Err(e) = worker.run().await {
+            log::error!("{}", e);
+        }
+    });
+    let worker = clean_worker::Worker::new(token.clone(), asr_client.clone(), pq_clean).await?;
     tracker.spawn(async move {
         if let Err(e) = worker.run().await {
             log::error!("{}", e);

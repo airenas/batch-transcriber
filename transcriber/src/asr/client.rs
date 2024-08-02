@@ -220,7 +220,51 @@ impl ASRClient {
             log::info!("call failed");
             let status = res.status();
             let body = res.text().await.unwrap_or("can't read body".into());
-            Err(anyhow::anyhow!("Request failed with status: {}\n{}", status, body))
+            Err(anyhow::anyhow!(
+                "Request failed with status: {}\n{}",
+                status,
+                body
+            ))
+        }
+    }
+
+    pub async fn clean(&self, id: &str) -> anyhow::Result<()> {
+        log::info!("clean id: {}", id);
+        let url = format!("{}/clean.service/delete/{}", self.url, id);
+
+        let policy = RetryPolicy::exponential(Duration::from_secs(1))
+            .with_max_retries(3)
+            .with_jitter(true);
+
+        let res = policy
+            .retry_if(
+                || async {
+                    log::info!("call: {}", url);
+                    let res = self
+                        .client
+                        .delete(&url)
+                        .timeout(Duration::from_secs(10))
+                        .send()
+                        .await?;
+                    res.error_for_status()
+                        .map_err(|err| Box::new(err) as Box<dyn Error + Send + Sync>)
+                },
+                is_retry_err,
+            )
+            .await
+            .map_err(anyhow::Error::msg)?;
+        if res.status().is_success() {
+            log::info!("call ok");
+            Ok(())
+        } else {
+            log::info!("call failed");
+            let status = res.status();
+            let body = res.text().await.unwrap_or("can't read body".into());
+            Err(anyhow::anyhow!(
+                "Request failed with status: {}\n{}",
+                status,
+                body
+            ))
         }
     }
 }

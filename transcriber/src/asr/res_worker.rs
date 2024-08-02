@@ -2,12 +2,12 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use crate::filer::file::Filer;
-use crate::{ASR_FILE_LAT, ASR_FILE_RES, DIR_FAILED, DIR_PROCESSED, DIR_WORKING};
+use crate::{QSender, ASR_FILE_LAT, ASR_FILE_RES, DIR_FAILED, DIR_PROCESSED, DIR_WORKING};
 use pgmq::Message;
 use tokio_util::sync::CancellationToken;
 
 use super::client::ASRClient;
-use crate::data::api::ResultMessage;
+use crate::data::api::{CleanMessage, ResultMessage};
 use crate::postgres::queue::PQueue;
 
 pub struct Worker {
@@ -15,6 +15,7 @@ pub struct Worker {
     result_queue: PQueue,
     ct: CancellationToken,
     asr_client: ASRClient,
+    clean_queue: Box<dyn QSender<CleanMessage> + Send + Sync>,
 }
 
 impl Worker {
@@ -23,6 +24,7 @@ impl Worker {
         asr_client: ASRClient,
         result_queue: PQueue,
         filer: Filer,
+        clean_queue: Box<dyn QSender<CleanMessage> + Send + Sync>,
     ) -> Result<Self, Box<dyn Error + Send + Sync>> {
         log::info!("Init Result Worker");
         Ok(Self {
@@ -30,6 +32,7 @@ impl Worker {
             result_queue,
             ct,
             asr_client,
+            clean_queue,
         })
     }
 
@@ -87,7 +90,7 @@ impl Worker {
         {
             log::info!("No info file?: {}", e);
         }
-        Ok(())
+        self.send_clean_msg(&msg_asr.external_id).await
     }
 
     async fn process_success(&self, msg_asr: ResultMessage) -> anyhow::Result<()> {
@@ -106,11 +109,19 @@ impl Worker {
         {
             log::info!("No info file?: {}", e);
         }
-        Ok(())
+        self.send_clean_msg(&msg_asr.external_id).await
     }
 
     async fn load_res(&self, external_id: &str, file: &str) -> anyhow::Result<String> {
         self.asr_client.result(external_id, file).await
+    }
+
+    async fn send_clean_msg(&self, external_id: &str) -> anyhow::Result<()> {
+        self.clean_queue
+            .send(CleanMessage {
+                external_id: external_id.to_string(),
+            })
+            .await
     }
 }
 

@@ -16,3 +16,8 @@ pub struct ResultMessage {
     pub base_dir: String,
     pub error: Option<String>,
 }
+
+#[derive(Serialize, Debug, Deserialize, Clone)]
+pub struct CleanMessage {
+    pub external_id: String,
+}

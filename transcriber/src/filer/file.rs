@@ -3,6 +3,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use axum::{body::Bytes, BoxError};
+use futures::Stream;
+use tokio::{fs::File, io::{self, BufWriter}};
+use futures::TryStreamExt;
+use tokio_util::io::StreamReader;
+
 #[derive(Clone)]
 pub struct Filer {
     base_dir: String,
@@ -28,6 +34,37 @@ impl Filer {
         fs::write(f_new, txt)
             .map_err(|err| format!("Can't write file: {}\n{}", f_new, err))
             .map_err(anyhow::Error::msg)?;
+        log::info!("saved: {}", f_new);
+        Ok(())
+    }
+
+    pub async fn save_stream<S, E>(
+        &self,
+        f_name: &str,
+        folder: &str,
+        stream: S,
+    ) -> anyhow::Result<()>
+    where
+        S: Stream<Item = Result<Bytes, E>>,
+        E: Into<BoxError>,
+    {
+        log::info!("saving file: {}", f_name);
+        let mut dest_path = PathBuf::from(self.base_dir.as_str());
+        dest_path.extend(&[folder, f_name]);
+        let f_new = dest_path
+            .to_str()
+            .ok_or("Failed to convert path to string")
+            .map_err(anyhow::Error::msg)?;
+        self.try_create_folder(&dest_path)?;
+
+        let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+        let body_reader = StreamReader::new(body_with_io_error);
+        
+        let mut file = BufWriter::new(File::create(&dest_path).await?);
+        futures::pin_mut!(body_reader);
+
+        // Copy the body into the file.
+        tokio::io::copy(&mut body_reader, &mut file).await?;
         log::info!("saved: {}", f_new);
         Ok(())
     }

@@ -6,6 +6,10 @@ run/worker:
 		--asr-url=https://atpazinimas.intelektika.lt/ausis --asr-auth-key=
 .PHONY: run/worker
 ###############################################################################
+run/sound-keeper:
+	RUST_LOG=$(log) cargo run --bin sound-keeper -- --base-dir=./test
+.PHONY: run/sound-keeper
+###############################################################################
 build/local: 
 	cargo build --release
 .PHONY: build/local

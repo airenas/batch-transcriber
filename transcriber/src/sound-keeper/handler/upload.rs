@@ -7,6 +7,7 @@ use axum::{
     BoxError, Json,
 };
 use chrono::Local;
+use scopeguard::guard;
 use serde::Serialize;
 use transcriber::{
     filer::file::{make_name, Filer},
@@ -28,6 +29,18 @@ pub async fn handler(
 ) -> Result<extract::Json<UploadResult>, ApiError> {
     let mut values: hash_map::HashMap<String, String> = hash_map::HashMap::new();
     let mut saved_file: Option<String> = None;
+    let saved_file1: Option<String> = None;
+    
+    
+    let mut file_guard = guard(saved_file1, |saved_file| {
+        tracing::debug!(value = saved_file, "guard run");
+        if let Some(file) = saved_file {
+            if let Err(err) = filer.delete(&file, DIR_INCOMING) {
+                log::error!("{}", err);
+            }
+        }
+    });
+
     while let Some(field) = multipart
         .next_field()
         .await
@@ -42,7 +55,8 @@ pub async fn handler(
         if !file_name.is_empty() {
             validate_name(&file_name).map_err(err_bad_request)?;
             let saved = stream_to_file(&filer, &file_name, field).await?;
-            saved_file = Some(saved);
+            saved_file = Some(saved.clone());
+            file_guard.replace(saved);
         } else {
             let value = field
                 .text()
@@ -67,6 +81,7 @@ pub async fn handler(
             filer.save_txt(&make_name(&file, INFO_EXTENSION), DIR_INCOMING, &data)?;
 
             let res = UploadResult { id: file };
+            file_guard.take();
             Ok(Json(res))
         }
         None => {

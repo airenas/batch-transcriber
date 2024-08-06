@@ -4,10 +4,14 @@ use tokio::net::TcpListener;
 use tokio::signal;
 
 use clap::Parser;
-use tower_http::{limit::RequestBodyLimitLayer, timeout::TimeoutLayer};
 use tower_http::trace::TraceLayer;
+use tower_http::{limit::RequestBodyLimitLayer, timeout::TimeoutLayer};
 
-use axum::{extract::DefaultBodyLimit, routing::{get, post}, Router};
+use axum::{
+    extract::DefaultBodyLimit,
+    routing::{get, post},
+    Router,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use transcriber::filer::file::Filer;
 
@@ -27,8 +31,8 @@ struct Args {
 async fn main_int(args: Args) -> anyhow::Result<()> {
     log::info!("Starting file adder");
     tracing::info!(version = env!("CARGO_APP_VERSION"));
-    log::info!("Base dir     : {}", args.base_dir);
-    log::info!("Port         : {}", args.port);
+    tracing::info!(dir = args.base_dir, "base dir");
+    tracing::info!(port = args.port, "port");
     log::info!("Init tracing...");
 
     log::info!("Connecting to postgres...");

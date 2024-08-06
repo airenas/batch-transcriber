@@ -5,8 +5,11 @@ use std::{
 
 use axum::{body::Bytes, BoxError};
 use futures::Stream;
-use tokio::{fs::File, io::{self, BufWriter}};
 use futures::TryStreamExt;
+use tokio::{
+    fs::File,
+    io::{self, BufWriter},
+};
 use tokio_util::io::StreamReader;
 
 #[derive(Clone)]
@@ -59,7 +62,7 @@ impl Filer {
 
         let body_with_io_error = stream.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
         let body_reader = StreamReader::new(body_with_io_error);
-        
+
         let mut file = BufWriter::new(File::create(&dest_path).await?);
         futures::pin_mut!(body_reader);
 
@@ -129,6 +132,17 @@ impl Filer {
             .map_err(anyhow::Error::msg)?;
         log::info!("moved: {} -> {}", f, f_new);
         Ok(())
+    }
+
+    pub fn delete(&self, f_name: &str, dir_incoming: &str) -> anyhow::Result<()> {
+        let mut source_path = PathBuf::from(self.base_dir.as_str());
+        source_path.extend(&[dir_incoming, f_name]);
+        let f = source_path
+            .to_str()
+            .ok_or("Failed to convert path to string")
+            .map_err(anyhow::Error::msg)?;
+        tracing::info!(file = f, "delete");
+        fs::remove_file(source_path).map_err(anyhow::Error::msg)
     }
 }
 

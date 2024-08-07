@@ -27,3 +27,29 @@ services:
       - DATABASE_URL=${POSTGRES_URL}
     depends_on:
       - postgres  
+
+  worker:
+    image:   airenas/bt-worker:dev
+    logging: *default-logging
+    volumes:
+      - ./.data:/data:rw
+    user: 1000:1000  
+    environment:
+      - POSTGRES_URL=${POSTGRES_URL}
+      - BASE_DIR=/data
+      - ASR_URL=https://atpazinimas.intelektika.lt/ausis
+      - RUST_LOG=INFO
+
+  keeper:
+    image:   airenas/bt-sound-keeper:dev
+    logging: *default-logging
+    volumes:
+      - ./.data:/data:rw
+    user: 1000:1000 
+    ports:
+      - "8001:8000" 
+    environment:
+      - BASE_DIR=/data
+      - RUST_LOG=INFO  
+
+    

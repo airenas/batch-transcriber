@@ -16,3 +16,4 @@ transcriber/Makefile.options
 transcriber/test
 transcriber/.env
 deploy/local/.env
+deploy/local/.data/

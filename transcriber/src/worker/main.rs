@@ -1,17 +1,15 @@
 use deadpool_diesel::postgres::{Manager, Pool};
 use deadpool_diesel::Runtime;
 use std::error::Error;
-use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use transcriber::asr::client::ASRClient;
 use transcriber::asr::{clean_worker, res_worker, worker};
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
-use transcriber::{CLEAN_QUEUE, INPUT_QUEUE, RESULT_QUEUE};
+use transcriber::{shutdown_signal, CLEAN_QUEUE, INPUT_QUEUE, RESULT_QUEUE};
 
 use clap::Parser;
-// use super:: lib::filer::Filer;
 
 /// ASR Worker
 #[derive(Parser, Debug)]
@@ -100,17 +98,8 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
 
     tracker.close();
 
-    match signal::ctrl_c().await {
-        Ok(()) => {
-            log::info!("Cancel...");
-            token.cancel()
-        }
-        Err(err) => {
-            return Err(format!("Error registering signal handler: {}", err).into());
-        }
-    }
-
-    // Wait for everything to finish.
+    shutdown_signal().await;
+    token.cancel();
     tracker.wait().await;
 
     log::info!("Done");

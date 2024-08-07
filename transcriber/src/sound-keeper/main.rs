@@ -1,7 +1,6 @@
 pub mod handler;
 use std::time::Duration;
 use tokio::net::TcpListener;
-use tokio::signal;
 
 use clap::Parser;
 use tower_http::trace::TraceLayer;
@@ -14,6 +13,7 @@ use axum::{
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use transcriber::filer::file::Filer;
+use transcriber::shutdown_signal;
 
 /// Sound saver http service
 #[derive(Parser, Debug)]
@@ -71,28 +71,4 @@ async fn main() -> anyhow::Result<()> {
         return Err(e);
     }
     Ok(())
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    tokio::select! {
-        _ = ctrl_c => {
-            log::info!("Ctrl-C received, shutting down");
-        },
-        _ = terminate => {
-            log::info!("SIGTERM received, shutting down");
-        },
-    }
 }

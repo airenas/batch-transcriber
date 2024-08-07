@@ -6,7 +6,7 @@ use transcriber::{data::api::ASRMessage, DIR_WORKING};
 use clap::Parser;
 use transcriber::{QSender, DIR_INCOMING, INFO_EXTENSION, INPUT_QUEUE};
 use ulid::Ulid;
-// use super:: lib::filer::Filer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Add audio task to to transcription queue
 #[derive(Parser, Debug)]
@@ -135,7 +135,10 @@ async fn add_files(
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 1)]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::Layer::default().compact())
+        .init();
     let args = Args::parse();
     if let Err(e) = main_int(args).await {
         log::error!("{}", e);

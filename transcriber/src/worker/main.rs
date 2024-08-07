@@ -8,6 +8,7 @@ use transcriber::asr::{clean_worker, res_worker, worker};
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
 use transcriber::{shutdown_signal, CLEAN_QUEUE, INPUT_QUEUE, RESULT_QUEUE};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use clap::Parser;
 
@@ -108,7 +109,10 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    env_logger::init();
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::Layer::default().compact())
+        .init();
     let args = Args::parse();
     if let Err(e) = main_int(args).await {
         log::error!("{}", e);

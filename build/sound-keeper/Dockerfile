@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 #########################################################################################
 FROM debian:buster-slim AS runner
 
-RUN apt-get update && apt-get -y install openssl ca-certificates
+# RUN apt-get update && apt-get -y install openssl ca-certificates
 
 ENV UID=999
 

@@ -3,7 +3,7 @@
 #########################################################################################
 FROM rust:1.79-buster AS builder
 
-# RUN apk --update add openssl-dev musl-dev
+RUN apt-get update && apt-get -y install openssl libssl-dev
 
 ARG BUILD_VERSION=0.1
 
@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 #########################################################################################
 FROM debian:buster-slim AS runner
 
-RUN apt-get update && apt-get -y install openssl ca-certificates libpq-dev
+RUN apt-get update && apt-get -y install libpq5 ca-certificates
 
 ENV UID=999
 

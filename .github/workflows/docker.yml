@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: [dbmigrate]
+        container: [dbmigrate, sound-keeper]
     steps:
       - name: Checkout
         uses: actions/checkout@v3

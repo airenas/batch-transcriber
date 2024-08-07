@@ -20,6 +20,10 @@ struct Args {
     #[arg(short, long, env)]
     base_dir: String,
 
+    /// Server base working dir
+    #[arg(short, long, env, default_value = "")]
+    server_base_dir: String,
+
     /// Postgres SQL (QUEUE) connection string
     #[arg(short, long, env)]
     postgres_url: String,
@@ -51,9 +55,9 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let sender = Box::new(pq) as Box<dyn QSender<ASRMessage>>;
     let f = Filer::new(&args.base_dir);
     let added = if args.auto {
-        add_files(sender.as_ref(), &f, &args.base_dir, args.only_msg).await?
+        add_files(sender.as_ref(), &f, &args.base_dir, &args.server_base_dir, args.only_msg).await?
     } else {
-        add_file(sender.as_ref(), &f, &file, &args.base_dir, args.only_msg).await?
+        add_file(sender.as_ref(), &f, &file, &args.base_dir, &args.server_base_dir, args.only_msg).await?
     };
     if added == 0 {
         log::warn!("No files to transcribe");
@@ -68,6 +72,7 @@ async fn add_file(
     f: &Filer,
     file: &str,
     base_dir: &str,
+    server_base_dir: &str,
     only_msg: bool,
 ) -> anyhow::Result<i64> {
     log::info!("Add file     : {}", file);
@@ -87,11 +92,15 @@ async fn add_file(
         log::warn!("Skip copying file");
     }
     let ulid = Ulid::new();
+    let mut s_dir = server_base_dir;
+    if s_dir.is_empty() {
+        s_dir = base_dir;
+    }
     sender
         .send(ASRMessage {
             file: new_f_name,
             id: ulid.to_string(),
-            base_dir: base_dir.to_string(),
+            base_dir: s_dir.to_string(),
         })
         .await?;
     Ok(1)
@@ -101,6 +110,7 @@ async fn add_files(
     sender: &dyn QSender<ASRMessage>,
     f: &Filer,
     base_dir: &str,
+    server_base_dir: &str,
     only_msg: bool,
 ) -> anyhow::Result<i64> {
     let mut source_path = PathBuf::from(base_dir);
@@ -115,7 +125,7 @@ async fn add_files(
                 let ext_str = ext.to_str().unwrap_or("").to_lowercase();
                 if ext_str == "mp3" || ext_str == "wav" || ext_str == "m4a" {
                     let file = path.file_name().unwrap().to_str().unwrap();
-                    res += add_file(sender, f, file, base_dir, only_msg).await?;
+                    res += add_file(sender, f, file, base_dir, server_base_dir, only_msg).await?;
                 }
             }
         }

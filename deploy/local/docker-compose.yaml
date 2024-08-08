@@ -50,6 +50,12 @@ services:
       - "8001:8000" 
     environment:
       - BASE_DIR=/data
-      - RUST_LOG=INFO  
+      - RUST_LOG=INFO
+
+  upload-gui:
+    image:   airenas/bt-upload-gui:dev
+    logging: *default-logging
+    ports:
+      - "8002:8000"     
 
     

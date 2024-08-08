@@ -20,3 +20,4 @@ deploy/local/.data/
 upload-gui/.next
 upload-gui/node_modules
 **/.vscode/launch.json
+upload-gui/out

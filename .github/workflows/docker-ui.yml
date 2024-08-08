@@ -6,19 +6,19 @@ on:
       - "v*.*.*"
     branches: [ main ]
     paths:
-      - "transcriber/**"
+      - "upload-gui/**"
       - "build/**"
   pull_request:
     branches: [ main ] 
     paths:
-      - "transcriber/**"
+      - "upload-gui/**"
       - "build/**"
 jobs:
   docker:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: [dbmigrate, sound-keeper, worker]
+        container: [upload-gui]
     steps:
       - name: Checkout
         uses: actions/checkout@v3

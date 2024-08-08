@@ -17,3 +17,5 @@ transcriber/test
 transcriber/.env
 deploy/local/.env
 deploy/local/.data/
+upload-gui/.next
+upload-gui/node_modules

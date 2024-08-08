@@ -30,8 +30,7 @@ pub async fn handler(
     let mut values: hash_map::HashMap<String, String> = hash_map::HashMap::new();
     let mut saved_file: Option<String> = None;
     let saved_file1: Option<String> = None;
-    
-    
+
     let mut file_guard = guard(saved_file1, |saved_file| {
         tracing::debug!(value = saved_file, "guard run");
         if let Some(file) = saved_file {
@@ -112,9 +111,8 @@ fn make_data(values: &hash_map::HashMap<String, String>) -> Result<String, anyho
         values.get("time").unwrap_or(&"".to_string())
     ));
     data.push_str(&format!(
-        "Name     : {} {}\n",
-        values.get("name").unwrap_or(&"".to_string()),
-        values.get("surname").unwrap_or(&"".to_string())
+        "Name     : {}\n",
+        values.get("name").unwrap_or(&"".to_string())
     ));
     data.push_str(&format!(
         "Office   : {}\n",
@@ -130,9 +128,6 @@ fn make_data(values: &hash_map::HashMap<String, String>) -> Result<String, anyho
 fn validate(values: &hash_map::HashMap<String, String>) -> Result<(), anyhow::Error> {
     if !values.contains_key("name") || values.get("name").is_some_and(|v| v.is_empty()) {
         return Err(anyhow::Error::msg("no name"));
-    }
-    if !values.contains_key("surname") || values.get("surname").is_some_and(|v| v.is_empty()) {
-        return Err(anyhow::Error::msg("no surname"));
     }
     if !values.contains_key("office") || values.get("office").is_some_and(|v| v.is_empty()) {
         return Err(anyhow::Error::msg("no office"));

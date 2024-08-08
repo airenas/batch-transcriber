@@ -1,13 +1,15 @@
-import type { Metadata } from 'next'
- 
-// These styles apply to every route in the application
-import './globals.css'
- 
+import { NextUIProvider } from '@nextui-org/react';
+import type { Metadata } from 'next';
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
+import { ToastContainer } from 'react-toastify';
+import './globals.css';
+import VersionLogger from './version-logger';
+
 export const metadata: Metadata = {
-  title: 'Upload audio DiPolis App',
-  description: 'Upload audio app',
+  title: 'DiPolis Audio saugykla',
+  description: 'DiPolis audio failų saugykla',
 }
- 
+
 export default function RootLayout({
   children,
 }: {
@@ -15,7 +17,31 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <VersionLogger />
+      <body>
+        <NextThemesProvider
+          defaultTheme="system"
+          attribute="class"
+        >
+          <NextUIProvider>
+            {children}
+          </NextUIProvider>
+        </NextThemesProvider>
+
+        <ToastContainer
+          position="bottom-center"
+          autoClose={5000}
+          hideProgressBar
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+        />
+
+      </body>
+
     </html>
   )
 }

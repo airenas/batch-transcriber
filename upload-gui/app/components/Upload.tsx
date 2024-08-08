@@ -1,13 +1,15 @@
 "use client";
+import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import React, { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
+import { isDark } from '../utils';
 
 interface UploadProps {
-  isNightMode: boolean;
 }
 
-const Upload: React.FC<UploadProps> = ({ isNightMode }) => {
+const Upload: React.FC<UploadProps> = ({ }) => {
+  const { theme } = useTheme();
   const [name, setName] = useState<string>('');
   const [office, setOffice] = useState<string>('');
   const [speakerCount, setSpeakerCount] = useState<number | ''>('');
@@ -69,7 +71,7 @@ const Upload: React.FC<UploadProps> = ({ isNightMode }) => {
       toast.error('Please fill in all fields and select an audio file.');
       return;
     }
-    
+
     const formData = new FormData();
     formData.append('name', name);
     formData.append('office', office);
@@ -87,20 +89,20 @@ const Upload: React.FC<UploadProps> = ({ isNightMode }) => {
       }
       return response.json(); // Proceed with parsing JSON if status is OK
     })
-    .then(data => {
-      console.log('Form submitted:', data);
-      router.push('/success?id=' + data.id);
-    })
-    .catch(error => {
-      console.error('Error submitting form:', error);
-      toast.error('Error submitting form: ' + error.message);
-    });
+      .then(data => {
+        console.log('Form submitted:', data);
+        router.push('/success?id=' + data.id);
+      })
+      .catch(error => {
+        console.error('Error submitting form:', error);
+        toast.error('Error submitting form: ' + error.message);
+      });
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className={`p-6 shadow-md rounded ${isNightMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-black border-gray-300'} border`}
+      className={`p-6 shadow-md rounded ${isDark(theme) ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-black border-gray-300'} border`}
     >
       <div className="mb-4">
         <label htmlFor="name" className="block text-sm font-medium mb-2">Name</label>
@@ -109,7 +111,7 @@ const Upload: React.FC<UploadProps> = ({ isNightMode }) => {
           id="name"
           value={name}
           onChange={(e) => setNameLocal(e.target.value)}
-          className={`w-full p-2 border rounded ${isNightMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
+          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
         />
         {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
       </div>
@@ -120,7 +122,7 @@ const Upload: React.FC<UploadProps> = ({ isNightMode }) => {
           id="office"
           value={office}
           onChange={(e) => setOfficeLocal(e.target.value)}
-          className={`w-full p-2 border rounded ${isNightMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
+          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
         />
         {errors.office && <p className="text-red-500 text-sm mt-1">{errors.office}</p>}
       </div>
@@ -131,9 +133,9 @@ const Upload: React.FC<UploadProps> = ({ isNightMode }) => {
           id="speakerCount"
           value={speakerCount}
           onChange={(e) => setSpeakerCountLocal(Number(e.target.value))}
-          className={`w-full p-2 border rounded ${isNightMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
+          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
         />
-         {errors.speakerCount && <p className="text-red-500 text-sm mt-1">{errors.speakerCount}</p>}
+        {errors.speakerCount && <p className="text-red-500 text-sm mt-1">{errors.speakerCount}</p>}
       </div>
       <div className="mb-4">
         <label htmlFor="audioFile" className="block text-sm font-medium mb-2">Audio File</label>
@@ -141,14 +143,14 @@ const Upload: React.FC<UploadProps> = ({ isNightMode }) => {
           type="file"
           id="audioFile"
           onChange={handleFileChange}
-          className={`w-full p-2 border rounded ${isNightMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
+          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
         />
-         {fileSize && <p className="text-gray-600 text-sm mt-1">File size: {fileSize}</p>}
-         {errors.audioFile && <p className="text-red-500 text-sm mt-1">{errors.audioFile}</p>}
+        {fileSize && <p className="text-gray-600 text-sm mt-1">File size: {fileSize}</p>}
+        {errors.audioFile && <p className="text-red-500 text-sm mt-1">{errors.audioFile}</p>}
       </div>
       <button
         type="submit"
-        className={`w-full py-2 rounded ${isNightMode ? 'bg-blue-500 hover:bg-blue-600' : 'bg-blue-700 hover:bg-blue-800'} text-white`}
+        className={`w-full py-2 rounded ${isDark(theme) ? 'bg-blue-500 hover:bg-blue-600' : 'bg-blue-700 hover:bg-blue-800'} text-white`}
       >
         Submit
       </button>

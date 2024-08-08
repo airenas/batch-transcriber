@@ -1,42 +1,49 @@
 "use client"
 
-import React from 'react';
+import { Tooltip } from "@nextui-org/tooltip";
+import { useTheme } from "next-themes";
 import { useRouter } from 'next/navigation';
+import React from 'react';
+import { MdDarkMode, MdLightMode, MdOutlineAddCircleOutline } from "react-icons/md";
+import { isDark } from "../utils";
 
 interface HeaderProps {
-  isNightMode: boolean;
-  toggleNightMode: () => void;
   showHomeButton: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ isNightMode, toggleNightMode, showHomeButton }) => {
-
+const Header: React.FC<HeaderProps> = ({ showHomeButton }) => {
+  const { theme, setTheme } = useTheme()
   const router = useRouter();
 
   const handleHomeClick = () => {
-    router.push('/'); // Navigate to the home page
+    router.push('/');
+  };
+
+  const toggleNightMode = () => {
+    const nextTheme = isDark(theme) ? "light" : "dark";
+    setTheme(nextTheme);
   };
 
   return (
-    <header className={`p-4 ${isNightMode ? 'bg-gray-800' : 'bg-gray-200'} text-white`}>
-      {showHomeButton && (
-      <button
-        onClick={handleHomeClick}
-        className={`mt-2 p-2 ${isNightMode ? 'bg-blue-300' : 'bg-blue-500'} text-white rounded`}
-      >
-        Upload
-      </button>
-      )}
-
-      <h1 className="text-3xl font-bold">My Next.js App</h1>
-      <button
-        onClick={toggleNightMode}
-        className={`mt-2 p-2 ${isNightMode ? 'bg-blue-300' : 'bg-blue-500'} text-white rounded`}
-      >
-        {isNightMode ? 'Switch to Day Mode' : 'Switch to Night Mode'}
-      </button>
-
-
+    <header className={`p-4 flex justify-end ${isDark(theme) ? "dark" : "light" } text-white`}>
+      <div className="flex items-center space-x-4">
+        {showHomeButton && (
+          <Tooltip content="Siųsti naują failą">
+            <button
+              onClick={handleHomeClick}
+            >
+              <MdOutlineAddCircleOutline className={`w-6 h-6`} />
+            </button>
+          </Tooltip>
+        )}
+        <Tooltip content="Pakeisti temą">
+          <button
+            onClick={toggleNightMode}
+          >
+            {isDark(theme) ? <MdLightMode className="w-6 h-6" /> : <MdDarkMode className="w-6 h-6" />}
+          </button>
+        </Tooltip>
+      </div>
     </header>
   );
 };

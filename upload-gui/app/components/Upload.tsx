@@ -119,7 +119,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
       formData.append('speakers', speakers);
       formData.append('file', audioFile);
 
-      fetch('http://localhost:8001/upload', {
+      fetch('http://localhost:8001/upload', { ///TODO
         method: 'POST',
         body: formData,
       }).then(response => {

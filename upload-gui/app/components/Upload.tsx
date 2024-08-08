@@ -1,10 +1,9 @@
 "use client";
-import { Button, Progress } from '@nextui-org/react';
+import { Button, Input, Progress } from '@nextui-org/react';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import React, { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { isDark } from '../utils';
 
 interface UploadProps {
 }
@@ -13,12 +12,13 @@ const Upload: React.FC<UploadProps> = ({ }) => {
   const { theme } = useTheme();
   const [name, setName] = useState<string>('');
   const [office, setOffice] = useState<string>('');
-  const [speakerCount, setSpeakerCount] = useState<number | ''>('');
+  const [speakers, setSpeakers] = useState<string>('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const router = useRouter();
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [errName, setErrName] = useState<string>('');
 
   useEffect(() => {
     const savedName = localStorage.getItem('form-name');
@@ -27,44 +27,79 @@ const Upload: React.FC<UploadProps> = ({ }) => {
 
     if (savedName) setName(savedName);
     if (savedOffice) setOffice(savedOffice);
-    if (savedSpeakerCount) setSpeakerCount(Number(savedSpeakerCount));
+    if (savedSpeakerCount) setSpeakers(savedSpeakerCount);
   }, []);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setAudioFile(file);
-
-      // Convert file size to a human-readable format
       const sizeInMB = (file.size / (1024 * 1024)).toFixed(2); // Convert bytes to megabytes
       setFileSize(`${sizeInMB} MB`);
     }
   };
 
   const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-    if (!name) newErrors.name = 'Įveskite vardą';
-    if (!office) newErrors.office = 'Įveskite komisariato pavadinimą';
-    if (speakerCount === '') newErrors.speakerCount = 'Nurodykite kalbėtojų kiekį';
-    if (!audioFile) newErrors.audioFile = 'Pasirinkite failą';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    checkName(name);
+    checkOffice(office);
+    checkSpeakers(speakers);
+    checkAudio(audioFile);
+    console.log('Errors:', errors);
+    return !errName;
   };
 
   const setNameLocal = (value: string) => {
     setName(value);
     localStorage.setItem('form-name', value);
+    checkName(value);
   }
+
+  const checkName = (value: string) => {
+    if (!isValidStr(value)) {
+      setErrName('Įveskite vardą');
+    } else {
+      setErrName(undefined);
+    }
+  };
+
+  const checkSpeakers = (value: string) => {
+    if (!value || Number(value) < 1) {
+      setErrors({ ...errors, speakers: 'Nurodykite kalbėtojų kiekį' });
+    } else {
+      setErrors({ ...errors, speakers: undefined });
+    }
+  };
+
+  const checkAudio = (value: File) => {
+    if (!value) {
+      setErrors({ ...errors, audioFile: 'Pasirinkite failą' });
+    } else {
+      setErrors({ ...errors, audioFile: undefined });
+    }
+  };
+
+  const checkOffice = (value: string) => {
+    if (!isValidStr(value)) {
+      setErrors({ ...errors, office: 'Įveskite komisariato pavadinimą' });
+    } else {
+      setErrors({ ...errors, office: undefined });
+    }
+  };
 
   const setOfficeLocal = (value: string) => {
     setOffice(value);
     localStorage.setItem('form-office', value);
+    checkOffice(value);
   }
 
-  const setSpeakerCountLocal = (value: number) => {
-    setSpeakerCount(value);
+  const setSpeakersLocal = (value: string) => {
+    setSpeakers(value);
     localStorage.setItem('form-speakerCount', value.toString());
   }
+
+  const isValidStr = (v: string): boolean => {
+    return v && v.trim().length > 0;
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -81,9 +116,9 @@ const Upload: React.FC<UploadProps> = ({ }) => {
       const formData = new FormData();
       formData.append('name', name);
       formData.append('office', office);
-      formData.append('speakers', speakerCount.toString());
+      formData.append('speakers', speakers);
       formData.append('file', audioFile);
-  
+
       fetch('http://localhost:8001/upload', {
         method: 'POST',
         body: formData,
@@ -119,51 +154,59 @@ const Upload: React.FC<UploadProps> = ({ }) => {
   return (
     <form
       onSubmit={handleSubmit}
-    // className={`p-6 shadow-md rounded ${isDark(theme) ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-black border-gray-300'} border`}
     >
       <div className="mb-4">
-        <label htmlFor="name" className="block text-sm font-medium mb-2">Vardas</label>
-        <input
-          type="text"
-          id="name"
+        <Input
           value={name}
-          onChange={(e) => setNameLocal(e.target.value)}
-          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
-        />
-        {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
-      </div>
-      <div className="mb-4">
-        <label htmlFor="office" className="block text-sm font-medium mb-2">Komisariatas</label>
-        <input
           type="text"
-          id="office"
+          label="Vardas" placeholder="Vardas Pavardė"
+          variant="bordered"
+          isInvalid={errName !== undefined}
+          color={errName !== undefined ? "danger" : "primary"}
+          errorMessage={errName}
+          onValueChange={setNameLocal}
+          className="max-w-xs"
+        />
+      </div>
+      <div className="mb-4">
+        <Input
           value={office}
-          onChange={(e) => setOfficeLocal(e.target.value)}
-          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
+          type="text"
+          label="Komisariatas" placeholder="Komisariatas"
+          variant="bordered"
+          isInvalid={errors.office !== undefined}
+          color={errors.office !== undefined ? "danger" : "primary"}
+          errorMessage={errors.office}
+          onValueChange={setOfficeLocal}
+          className="max-w-xs"
         />
-        {errors.office && <p className="text-red-500 text-sm mt-1">{errors.office}</p>}
       </div>
       <div className="mb-4">
-        <label htmlFor="speakerCount" className="block text-sm font-medium mb-2">Kalbėtojų kiekis</label>
-        <input
+        <Input
+          value={speakers}
           type="number"
-          id="speakerCount"
-          value={speakerCount}
-          onChange={(e) => setSpeakerCountLocal(Number(e.target.value))}
-          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
+          label="Kalbėtojų kiekis" placeholder=""
+          variant="bordered"
+          isInvalid={errors.speakers !== undefined}
+          color={errors.speakers !== undefined ? "danger" : "primary"}
+          errorMessage={errors.speakers}
+          onValueChange={setSpeakersLocal}
+          className="max-w-xs"
         />
-        {errors.speakerCount && <p className="text-red-500 text-sm mt-1">{errors.speakerCount}</p>}
       </div>
       <div className="mb-4">
-        <label htmlFor="audioFile" className="block text-sm font-medium mb-2">Audio failas</label>
-        <input
+        <Input
           type="file"
-          id="audioFile"
-          onChange={handleFileChange}
-          className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
+          label="Audio failas"
+          variant="bordered"
+          accept=".mp3,.wav,.m4a"
+          isInvalid={errors.audioFile !== undefined}
+          color={errors.audioFile !== undefined ? "danger" : "primary"}
+          errorMessage={errors.audioFile}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileChange(e)}
+          className="max-w-xs"
         />
         {fileSize && <p className="text-gray-600 text-sm mt-1">Failo dydis: {fileSize}</p>}
-        {errors.audioFile && <p className="text-red-500 text-sm mt-1">{errors.audioFile}</p>}
       </div>
       <div>
         {isLoading &&

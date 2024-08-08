@@ -3,6 +3,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 
 use clap::Parser;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tower_http::{limit::RequestBodyLimitLayer, timeout::TimeoutLayer};
 
@@ -37,6 +38,10 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
 
     log::info!("Connecting to postgres...");
     let f = Filer::new(&args.base_dir);
+    
+    let cors = CorsLayer::new()
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+        .allow_origin(Any);
 
     let app = Router::new()
         .route("/live", get(handler::live::handler))
@@ -47,6 +52,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
         .layer((
             TraceLayer::new_for_http(),
             TimeoutLayer::new(Duration::from_secs(40)),
+            cors,
         ));
 
     let listener = TcpListener::bind(format!("0.0.0.0:{}", args.port)).await?;

@@ -1,5 +1,5 @@
 "use client";
-import { Button, Input, Progress } from '@nextui-org/react';
+import { Button, Input, Progress, Spacer } from '@nextui-org/react';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import React, { ChangeEvent, FormEvent, useEffect, useState } from 'react';
@@ -14,11 +14,16 @@ const Upload: React.FC<UploadProps> = ({ }) => {
   const [office, setOffice] = useState<string>('');
   const [speakers, setSpeakers] = useState<string>('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
+
   const router = useRouter();
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errName, setErrName] = useState<string>('');
+
+  const [errName, setErrName] = useState<string | null>(null);
+  const [errOffice, setErrOffice] = useState<string | null>(null);
+  const [errSpeakers, setErrSpeakers] = useState<string | null>(null);
+  const [errAudioFile, setErrAudioFile] = useState<string | null>(null);
+
 
   useEffect(() => {
     const savedName = localStorage.getItem('form-name');
@@ -31,21 +36,22 @@ const Upload: React.FC<UploadProps> = ({ }) => {
   }, []);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    var file: File | null = null;
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+      file = e.target.files[0];
       setAudioFile(file);
       const sizeInMB = (file.size / (1024 * 1024)).toFixed(2); // Convert bytes to megabytes
       setFileSize(`${sizeInMB} MB`);
     }
+    checkAudio(file);
   };
 
   const validateForm = () => {
-    checkName(name);
-    checkOffice(office);
-    checkSpeakers(speakers);
-    checkAudio(audioFile);
-    console.log('Errors:', errors);
-    return !errName;
+    checkName(name, true);
+    checkOffice(office, true);
+    checkSpeakers(speakers, true);
+    checkAudio(audioFile, true);
+    return errName === null && errOffice === null && errSpeakers === null && errAudioFile === null;
   };
 
   const setNameLocal = (value: string) => {
@@ -54,35 +60,43 @@ const Upload: React.FC<UploadProps> = ({ }) => {
     checkName(value);
   }
 
-  const checkName = (value: string) => {
+  const checkName = (value: string, fail: boolean = false) => {
     if (!isValidStr(value)) {
-      setErrName('Įveskite vardą');
+      if (fail) {
+        setErrName('Įveskite vardą');
+      }
     } else {
-      setErrName(undefined);
+      setErrName(null);
     }
   };
 
-  const checkSpeakers = (value: string) => {
+  const checkSpeakers = (value: string, fail: boolean = false) => {
     if (!value || Number(value) < 1) {
-      setErrors({ ...errors, speakers: 'Nurodykite kalbėtojų kiekį' });
+      if (fail) {
+        setErrSpeakers('Nurodykite kalbėtojų kiekį');
+      }
     } else {
-      setErrors({ ...errors, speakers: undefined });
+      setErrSpeakers(null);
     }
   };
 
-  const checkAudio = (value: File) => {
+  const checkAudio = (value: File, fail: boolean = false) => {
     if (!value) {
-      setErrors({ ...errors, audioFile: 'Pasirinkite failą' });
+      if (fail) {
+        setErrAudioFile('Pasirinkite failą');
+      }
     } else {
-      setErrors({ ...errors, audioFile: undefined });
+      setErrAudioFile(null);
     }
   };
 
-  const checkOffice = (value: string) => {
+  const checkOffice = (value: string, fail: boolean = false) => {
     if (!isValidStr(value)) {
-      setErrors({ ...errors, office: 'Įveskite komisariato pavadinimą' });
+      if (fail) {
+        setErrOffice('Įveskite komisariato pavadinimą');
+      }
     } else {
-      setErrors({ ...errors, office: undefined });
+      setErrOffice(null);
     }
   };
 
@@ -95,6 +109,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
   const setSpeakersLocal = (value: string) => {
     setSpeakers(value);
     localStorage.setItem('form-speakerCount', value.toString());
+    checkSpeakers(value);
   }
 
   const isValidStr = (v: string): boolean => {
@@ -103,52 +118,45 @@ const Upload: React.FC<UploadProps> = ({ }) => {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    console.log('Submitting form...');
-    try {
 
-      if (!validateForm()) {
-        toast.error('Užpildykite laukus', {
-          theme: theme
-        });
-        return;
-      }
-      const formData = new FormData();
-      formData.append('name', name);
-      formData.append('office', office);
-      formData.append('speakers', speakers);
-      formData.append('file', audioFile);
-
-      fetch('http://localhost:8001/upload', { ///TODO
-        method: 'POST',
-        body: formData,
-      }).then(response => {
-        if (!response.ok) {
-          return response.text().then(errorText => {
-            if (response.status === 400) {
-              const errSr = mapErr(errorText);
-              throw new Error(errSr);
-            }
-            throw new Error(`HTTP Klaida: ${response.status} - ${errorText}`);
-          });
-        }
-        return response.json(); // Proceed with parsing JSON if status is OK
-      })
-        .then(data => {
-          console.log('Form submitted:', data);
-          router.push('/success?id=' + data.id);
-        })
-        .catch(error => {
-          console.error('Error submitting form:', error);
-          toast.error('Klaida siunčiant: ' + error.message);
-        }).finally(() => {
-          setIsLoading(false);
-        });
-
-    } finally {
-      console.log('exit');
-      setIsLoading(false);
+    if (!validateForm()) {
+      toast.error('Užpildykite laukus', {
+        theme: theme
+      });
+      return;
     }
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('office', office);
+    formData.append('speakers', speakers);
+    formData.append('file', audioFile);
+
+    setIsLoading(true);
+    fetch('http://localhost:8001/upload', { ///TODO
+      method: 'POST',
+      body: formData,
+    }).then(response => {
+      if (!response.ok) {
+        return response.text().then(errorText => {
+          if (response.status === 400) {
+            const errSr = mapErr(errorText);
+            throw new Error(errSr);
+          }
+          throw new Error(`HTTP Klaida: ${response.status} - ${errorText}`);
+        });
+      }
+      return response.json();
+    })
+      .then(data => {
+        console.log('Form submitted:', data);
+        router.push('/success?id=' + data.id);
+      })
+      .catch(error => {
+        console.error('Error submitting form:', error);
+        toast.error('Klaida siunčiant: ' + error.message);
+      }).finally(() => {
+        setIsLoading(false);
+      });
   };
 
   return (
@@ -157,61 +165,68 @@ const Upload: React.FC<UploadProps> = ({ }) => {
     >
       <div className="mb-4">
         <Input
+          isRequired
           value={name}
           type="text"
-          label="Vardas" placeholder="Vardas Pavardė"
+          label="Vardas Pavardė"
           variant="bordered"
-          isInvalid={errName !== undefined}
-          color={errName !== undefined ? "danger" : "primary"}
+          isInvalid={errName !== null}
           errorMessage={errName}
           onValueChange={setNameLocal}
           className="max-w-xs"
+          size='lg'
         />
       </div>
       <div className="mb-4">
         <Input
+          isRequired
           value={office}
           type="text"
-          label="Komisariatas" placeholder="Komisariatas"
+          label="Komisariatas"
           variant="bordered"
-          isInvalid={errors.office !== undefined}
-          color={errors.office !== undefined ? "danger" : "primary"}
-          errorMessage={errors.office}
+          isInvalid={errOffice !== null}
+          errorMessage={errOffice}
           onValueChange={setOfficeLocal}
           className="max-w-xs"
+          size='lg'
         />
       </div>
       <div className="mb-4">
         <Input
+          isRequired
           value={speakers}
           type="number"
-          label="Kalbėtojų kiekis" placeholder=""
+          label="Kalbėtojų kiekis"
           variant="bordered"
-          isInvalid={errors.speakers !== undefined}
-          color={errors.speakers !== undefined ? "danger" : "primary"}
-          errorMessage={errors.speakers}
+          isInvalid={errSpeakers !== null}
+          errorMessage={errSpeakers}
           onValueChange={setSpeakersLocal}
           className="max-w-xs"
+          size='lg'
         />
+      </div>
+      <div>
+        <Spacer y={10} />
       </div>
       <div className="mb-4">
         <Input
+          isRequired
           type="file"
+          description={fileSize ? `Failo dydis: ${fileSize}` : null}
           label="Audio failas"
           variant="bordered"
           accept=".mp3,.wav,.m4a"
-          isInvalid={errors.audioFile !== undefined}
-          color={errors.audioFile !== undefined ? "danger" : "primary"}
-          errorMessage={errors.audioFile}
+          isInvalid={errAudioFile !== null}
+          errorMessage={errAudioFile}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileChange(e)}
           className="max-w-xs"
+          size='lg'
         />
-        {fileSize && <p className="text-gray-600 text-sm mt-1">Failo dydis: {fileSize}</p>}
       </div>
       <div>
         {isLoading &&
           <Progress
-            size="sm"
+            size="lg"
             isIndeterminate
             aria-label="Loading..."
             className="max-w-md"
@@ -220,6 +235,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
           <Button
             type="submit"
             color='primary'
+            size='lg'
           >
             Siųsti
           </Button>

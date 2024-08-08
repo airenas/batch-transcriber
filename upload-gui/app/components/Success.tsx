@@ -1,5 +1,6 @@
 "use client";
 
+import { Spacer } from '@nextui-org/react';
 import { useTheme } from 'next-themes';
 import { useSearchParams } from 'next/navigation';
 import React from 'react';
@@ -14,10 +15,13 @@ const Success: React.FC<SuccessProps> = ({ }) => {
   const id = searchParams.get('id') || '';
 
   return (
-    <div className={`${theme}`}>
-      {theme}
-      <h1 className="text-2xl font-bold text-green-500">Audio submitted successfully</h1>
-      {id && <h2 className="text-xl font-bold text-green-500">Filename: {id}</h2>}
+    <div>
+      <h1 className="text-2xl font-bold">Audio nusiųstas</h1>
+      {id && <div>
+        <Spacer y={4} />
+        <h2 className="text-xl font-bold">Failas: {id}</h2>
+      </div>
+      }
     </div>
   );
 };

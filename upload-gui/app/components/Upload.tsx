@@ -1,4 +1,5 @@
 "use client";
+import { Button, Progress } from '@nextui-org/react';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import React, { ChangeEvent, FormEvent, useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
   const router = useRouter();
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [fileSize, setFileSize] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const savedName = localStorage.getItem('form-name');
@@ -41,10 +43,10 @@ const Upload: React.FC<UploadProps> = ({ }) => {
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!name) newErrors.name = 'Name is required';
-    if (!office) newErrors.office = 'Office is required';
-    if (speakerCount === '') newErrors.speakerCount = 'Speaker count is required';
-    if (!audioFile) newErrors.audioFile = 'Audio file is required';
+    if (!name) newErrors.name = 'Įveskite vardą';
+    if (!office) newErrors.office = 'Įveskite komisariato pavadinimą';
+    if (speakerCount === '') newErrors.speakerCount = 'Nurodykite kalbėtojų kiekį';
+    if (!audioFile) newErrors.audioFile = 'Pasirinkite failą';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -66,46 +68,61 @@ const Upload: React.FC<UploadProps> = ({ }) => {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    console.log('Submitting form...');
+    try {
 
-    if (!validateForm()) {
-      toast.error('Please fill in all fields and select an audio file.');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('office', office);
-    formData.append('speakers', speakerCount.toString());
-    formData.append('file', audioFile);
-
-    fetch('http://localhost:8001/upload', {
-      method: 'POST',
-      body: formData,
-    }).then(response => {
-      if (!response.ok) {
-        return response.text().then(errorText => {
-          throw new Error(`HTTP Error: ${response.status} - ${errorText}`);
+      if (!validateForm()) {
+        toast.error('Užpildykite laukus', {
+          theme: theme
         });
+        return;
       }
-      return response.json(); // Proceed with parsing JSON if status is OK
-    })
-      .then(data => {
-        console.log('Form submitted:', data);
-        router.push('/success?id=' + data.id);
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('office', office);
+      formData.append('speakers', speakerCount.toString());
+      formData.append('file', audioFile);
+  
+      fetch('http://localhost:8001/upload', {
+        method: 'POST',
+        body: formData,
+      }).then(response => {
+        if (!response.ok) {
+          return response.text().then(errorText => {
+            if (response.status === 400) {
+              const errSr = mapErr(errorText);
+              throw new Error(errSr);
+            }
+            throw new Error(`HTTP Klaida: ${response.status} - ${errorText}`);
+          });
+        }
+        return response.json(); // Proceed with parsing JSON if status is OK
       })
-      .catch(error => {
-        console.error('Error submitting form:', error);
-        toast.error('Error submitting form: ' + error.message);
-      });
+        .then(data => {
+          console.log('Form submitted:', data);
+          router.push('/success?id=' + data.id);
+        })
+        .catch(error => {
+          console.error('Error submitting form:', error);
+          toast.error('Klaida siunčiant: ' + error.message);
+        }).finally(() => {
+          setIsLoading(false);
+        });
+
+    } finally {
+      console.log('exit');
+      setIsLoading(false);
+    }
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className={`p-6 shadow-md rounded ${isDark(theme) ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-black border-gray-300'} border`}
+    // className={`p-6 shadow-md rounded ${isDark(theme) ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-black border-gray-300'} border`}
     >
       <div className="mb-4">
-        <label htmlFor="name" className="block text-sm font-medium mb-2">Name</label>
+        <label htmlFor="name" className="block text-sm font-medium mb-2">Vardas</label>
         <input
           type="text"
           id="name"
@@ -116,7 +133,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
         {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
       </div>
       <div className="mb-4">
-        <label htmlFor="office" className="block text-sm font-medium mb-2">Office</label>
+        <label htmlFor="office" className="block text-sm font-medium mb-2">Komisariatas</label>
         <input
           type="text"
           id="office"
@@ -127,7 +144,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
         {errors.office && <p className="text-red-500 text-sm mt-1">{errors.office}</p>}
       </div>
       <div className="mb-4">
-        <label htmlFor="speakerCount" className="block text-sm font-medium mb-2">Speaker Count</label>
+        <label htmlFor="speakerCount" className="block text-sm font-medium mb-2">Kalbėtojų kiekis</label>
         <input
           type="number"
           id="speakerCount"
@@ -138,24 +155,42 @@ const Upload: React.FC<UploadProps> = ({ }) => {
         {errors.speakerCount && <p className="text-red-500 text-sm mt-1">{errors.speakerCount}</p>}
       </div>
       <div className="mb-4">
-        <label htmlFor="audioFile" className="block text-sm font-medium mb-2">Audio File</label>
+        <label htmlFor="audioFile" className="block text-sm font-medium mb-2">Audio failas</label>
         <input
           type="file"
           id="audioFile"
           onChange={handleFileChange}
           className={`w-full p-2 border rounded ${isDark(theme) ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}`}
         />
-        {fileSize && <p className="text-gray-600 text-sm mt-1">File size: {fileSize}</p>}
+        {fileSize && <p className="text-gray-600 text-sm mt-1">Failo dydis: {fileSize}</p>}
         {errors.audioFile && <p className="text-red-500 text-sm mt-1">{errors.audioFile}</p>}
       </div>
-      <button
-        type="submit"
-        className={`w-full py-2 rounded ${isDark(theme) ? 'bg-blue-500 hover:bg-blue-600' : 'bg-blue-700 hover:bg-blue-800'} text-white`}
-      >
-        Submit
-      </button>
+      <div>
+        {isLoading &&
+          <Progress
+            size="sm"
+            isIndeterminate
+            aria-label="Loading..."
+            className="max-w-md"
+          />}
+        {!isLoading &&
+          <Button
+            type="submit"
+            color='primary'
+          >
+            Siųsti
+          </Button>
+        }
+      </div>
     </form>
   );
 };
 
 export default Upload;
+function mapErr(errorText: string): string {
+  if (errorText === 'audio expected') {
+    return 'Blogas failas - ne audio failas';
+  }
+  return errorText;
+}
+

@@ -1,4 +1,4 @@
-import { NextUIProvider } from '@nextui-org/react';
+import { NextUIProvider, Progress } from '@nextui-org/react';
 import type { Metadata } from 'next';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { ToastContainer } from 'react-toastify';
@@ -25,21 +25,19 @@ export default function RootLayout({
         >
           <NextUIProvider>
             {children}
+            <ToastContainer
+              position="bottom-center"
+              autoClose={5000}
+              hideProgressBar
+              newestOnTop
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+            />
           </NextUIProvider>
         </NextThemesProvider>
-
-        <ToastContainer
-          position="bottom-center"
-          autoClose={5000}
-          hideProgressBar
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
-
       </body>
 
     </html>

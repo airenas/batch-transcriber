@@ -47,11 +47,11 @@ const Upload: React.FC<UploadProps> = ({ }) => {
   };
 
   const validateForm = () => {
-    checkName(name, true);
-    checkOffice(office, true);
-    checkSpeakers(speakers, true);
-    checkAudio(audioFile, true);
-    return errName === null && errOffice === null && errSpeakers === null && errAudioFile === null;
+    var ok = checkName(name, true);
+    ok = checkOffice(office, true) && ok;
+    ok = checkSpeakers(speakers, true) && ok;
+    ok = checkAudio(audioFile, true) && ok;
+    return ok;
   };
 
   const setNameLocal = (value: string) => {
@@ -60,44 +60,50 @@ const Upload: React.FC<UploadProps> = ({ }) => {
     checkName(value);
   }
 
-  const checkName = (value: string, fail: boolean = false) => {
+  const checkName = (value: string, fail: boolean = false): boolean => {
     if (!isValidStr(value)) {
       if (fail) {
         setErrName('Įveskite vardą');
       }
-    } else {
-      setErrName(null);
+      return false;
     }
+    setErrName(null);
+    return true;
+
   };
 
-  const checkSpeakers = (value: string, fail: boolean = false) => {
+  const checkSpeakers = (value: string, fail: boolean = false): boolean => {
     if (!value || Number(value) < 1) {
       if (fail) {
         setErrSpeakers('Nurodykite kalbėtojų kiekį');
       }
-    } else {
-      setErrSpeakers(null);
+      return false;
     }
+    setErrSpeakers(null);
+    return true;
   };
 
-  const checkAudio = (value: File, fail: boolean = false) => {
+  const checkAudio = (value: File, fail: boolean = false): boolean => {
     if (!value) {
       if (fail) {
         setErrAudioFile('Pasirinkite failą');
       }
-    } else {
-      setErrAudioFile(null);
+      return false;
     }
+
+    setErrAudioFile(null);
+    return true;
   };
 
-  const checkOffice = (value: string, fail: boolean = false) => {
+  const checkOffice = (value: string, fail: boolean = false): boolean => {
     if (!isValidStr(value)) {
       if (fail) {
         setErrOffice('Įveskite komisariato pavadinimą');
       }
-    } else {
-      setErrOffice(null);
+      return false;
     }
+    setErrOffice(null);
+    return true;
   };
 
   const setOfficeLocal = (value: string) => {
@@ -165,6 +171,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
     >
       <div className="mb-4">
         <Input
+          id='name'
           isRequired
           value={name}
           type="text"
@@ -179,6 +186,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
       </div>
       <div className="mb-4">
         <Input
+          id='office'
           isRequired
           value={office}
           type="text"
@@ -193,6 +201,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
       </div>
       <div className="mb-4">
         <Input
+          id='speakers'
           isRequired
           value={speakers}
           type="number"
@@ -210,6 +219,7 @@ const Upload: React.FC<UploadProps> = ({ }) => {
       </div>
       <div className="mb-4">
         <Input
+          id='audioFile'
           isRequired
           type="file"
           description={fileSize ? `Failo dydis: ${fileSize}` : null}

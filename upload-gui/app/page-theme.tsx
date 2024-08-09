@@ -6,7 +6,8 @@ import 'react-toastify/dist/ReactToastify.css';
 
 export default function PageTheme({ children }: { children: React.ReactNode }) {
   function getTheme(): string {
-    return localStorage.getItem('theme') || 'light';
+    return 'light';
+    // return localStorage.getItem('theme') || 'light';
   }
 
   return (

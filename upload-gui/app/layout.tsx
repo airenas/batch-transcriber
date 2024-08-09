@@ -13,10 +13,17 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '__BASE_PATH__'
+  console.log(`basePath: ${basePath}`)
+
   return (
-    <html lang="en">
-      <VersionLogger />
+    <html lang="lt">
+      <head>
+        <base href={basePath} />
+      </head>
       <body>
+        <VersionLogger />
         <PageTheme>
           {children}
         </PageTheme>

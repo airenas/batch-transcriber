@@ -10,7 +10,8 @@ import { isDark } from './utils';
 export default function Page() {
   const { theme } = useTheme()
 
-  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:8001/upload';
+  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || '__SERVER_URL__';
+  console.log(`serverUrl: ${serverUrl}`);
 
   return (
     <div>

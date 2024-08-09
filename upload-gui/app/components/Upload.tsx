@@ -6,9 +6,10 @@ import React, { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 
 interface UploadProps {
+  serverUrl: string;
 }
 
-const Upload: React.FC<UploadProps> = ({ }) => {
+const Upload: React.FC<UploadProps> = ({ serverUrl }) => {
   const { theme } = useTheme();
   const [name, setName] = useState<string>('');
   const [office, setOffice] = useState<string>('');
@@ -138,7 +139,8 @@ const Upload: React.FC<UploadProps> = ({ }) => {
     formData.append('file', audioFile);
 
     setIsLoading(true);
-    fetch('http://localhost:8001/upload', { ///TODO
+    console.log('Submitting form:', serverUrl);
+    fetch(serverUrl, { ///TODO
       method: 'POST',
       body: formData,
     }).then(response => {

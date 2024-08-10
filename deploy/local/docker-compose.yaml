@@ -56,6 +56,9 @@ services:
     image:   airenas/bt-upload-gui:dev
     logging: *default-logging
     ports:
-      - "8002:8000"     
+      - "8002:8000"
+    environment:
+      - BASE_PATH=/test
+      - SERVER_URL=http://localhost:8001/upload
 
     

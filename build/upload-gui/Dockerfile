@@ -15,20 +15,21 @@ ARG BUILD_VERSION=0.1
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY upload-gui/ .
-RUN echo "export const VERSION = '$BUILD_VERSION'" > /app/app/version.ts
+RUN echo "export const VERSION = '$BUILD_VERSION'" > /app/src/version.ts
 RUN npm run build
 
 #############################################################################
 FROM nginxinc/nginx-unprivileged:1.27-alpine3.19
 
-COPY build/upload-gui/entrypoint.sh /root/entrypoint.sh
+COPY build/upload-gui/entrypoint.sh /docker-entrypoint.d/40-cfg-entrypoint.sh
 COPY build/upload-gui/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/out /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 USER root
 
 # RUN chown nginx:nginx /root/entrypoint.sh
 RUN chown nginx:nginx /usr/share/nginx/html/*
+RUN chown nginx:nginx /usr/share/nginx/html
 
 USER nginx
 

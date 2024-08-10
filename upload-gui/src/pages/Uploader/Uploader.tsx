@@ -78,7 +78,7 @@ function Uploader() {
       },
       message: msg,
     });
-  };
+  }
 
   function showInfo(msg: string) {
     notificationsActions.push({
@@ -87,7 +87,7 @@ function Uploader() {
       },
       message: msg,
     });
-  };
+  }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();

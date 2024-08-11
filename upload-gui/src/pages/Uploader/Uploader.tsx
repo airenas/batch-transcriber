@@ -4,7 +4,7 @@ import { makeLink, serverUrl } from '@/config';
 import useNotifications from '@/store/notifications';
 import { Box, Button, LinearProgress, Stack, TextField } from '@mui/material';
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 
 function Uploader() {
   const [, notificationsActions] = useNotifications();
@@ -41,20 +41,20 @@ function Uploader() {
   const handleNameChange = (e: ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
     localStorage.setItem('form-name', e.target.value);
-    setNameError(e.target.value === '')
+    setNameError(e.target.value === '');
   };
 
   const handleOfficeChange = (e: ChangeEvent<HTMLInputElement>) => {
     setOffice(e.target.value);
     localStorage.setItem('form-office', e.target.value);
-    setOfficeError(e.target.value === '')
-  }
+    setOfficeError(e.target.value === '');
+  };
 
   const handleSpeakersChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSpeakers(Number(e.target.value));
     localStorage.setItem('form-speakers', e.target.value);
-    setSpeakersError(Number(e.target.value) < 1)
-  }
+    setSpeakersError(Number(e.target.value) < 1);
+  };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     let _file: File | null = null;
@@ -105,30 +105,33 @@ function Uploader() {
 
     setIsLoading(true);
     console.log('Submitting form:', serverUrl);
-    fetch(serverUrl, { ///TODO
+    fetch(serverUrl, {
+      ///TODO
       method: 'POST',
       body: formData,
-    }).then(response => {
-      if (!response.ok) {
-        return response.text().then(errorText => {
-          if (response.status === 400) {
-            const errSr = mapErr(errorText);
-            throw new Error(errSr);
-          }
-          throw new Error(`HTTP Klaida: ${response.status} - ${errorText}`);
-        });
-      }
-      return response.json();
     })
-      .then(data => {
+      .then((response) => {
+        if (!response.ok) {
+          return response.text().then((errorText) => {
+            if (response.status === 400) {
+              const errSr = mapErr(errorText);
+              throw new Error(errSr);
+            }
+            throw new Error(`HTTP Klaida: ${response.status} - ${errorText}`);
+          });
+        }
+        return response.json();
+      })
+      .then((data) => {
         console.log('Form submitted:', data);
         showInfo('Audio išsaugotas');
         navigate(makeLink('/success?id=' + data.id));
       })
-      .catch(error => {
+      .catch((error) => {
         console.error('Error submitting form:', error);
         showError('Klaida siunčiant: ' + error.message);
-      }).finally(() => {
+      })
+      .finally(() => {
         setIsLoading(false);
       });
   };
@@ -137,7 +140,12 @@ function Uploader() {
     <>
       <Meta title="siųsti failą" />
       <FullSizeCenteredFlexBox>
-        <Box component="form" onSubmit={handleSubmit} noValidate sx={{ width: '100%', maxWidth: "500px" }} >
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          noValidate
+          sx={{ width: '100%', maxWidth: '500px' }}
+        >
           <Stack spacing={2}>
             <TextField
               label="Vardas Pavardė"
@@ -147,7 +155,7 @@ function Uploader() {
               type="text"
               onChange={handleNameChange}
               error={nameError}
-              helperText={nameError ? "Įveskite vardą ir pavardę" : ""}
+              helperText={nameError ? 'Įveskite vardą ir pavardę' : ''}
             />
 
             <TextField
@@ -158,7 +166,7 @@ function Uploader() {
               type="text"
               onChange={handleOfficeChange}
               error={officeError}
-              helperText={officeError ? "Įveskite policijos komisariatą" : ""}
+              helperText={officeError ? 'Įveskite policijos komisariatą' : ''}
             />
 
             <TextField
@@ -169,26 +177,32 @@ function Uploader() {
               type="number"
               onChange={handleSpeakersChange}
               error={speakersError}
-              helperText={speakersError ? "Nurodykite kalbėtojų kiekį audio faile" : ""}
+              helperText={speakersError ? 'Nurodykite kalbėtojų kiekį audio faile' : ''}
             />
 
-            <TextField type="file"
-              label={file ? "Audio failas" : ""}
+            <TextField
+              type="file"
+              label={file ? 'Audio failas' : ''}
               inputProps={{
-                accept: ".mp3,.wav,.m4a",
-                multiple: false
+                accept: '.mp3,.wav,.m4a',
+                multiple: false,
               }}
               required
               id="file-input"
               error={fileError}
-              helperText={fileError ? "Pasirinkite failą" : (fileSize ? `Failo dydis: ${fileSize}` : "")}
+              helperText={
+                fileError ? 'Pasirinkite failą' : fileSize ? `Failo dydis: ${fileSize}` : ''
+              }
               onChange={handleFileChange}
             />
 
-            <Box sx={{ height: '50px' }} >
-              {!isLoading && <Button variant="contained" color="primary" type="submit"
-              >Siųsti</Button>}
-              {isLoading && <LinearProgress sx={{ top: "20px" }} />}
+            <Box sx={{ height: '50px' }}>
+              {!isLoading && (
+                <Button variant="contained" color="primary" type="submit">
+                  Siųsti
+                </Button>
+              )}
+              {isLoading && <LinearProgress sx={{ top: '20px' }} />}
             </Box>
           </Stack>
         </Box>
@@ -204,4 +218,3 @@ function mapErr(errorText: string): string {
   }
   return errorText;
 }
-

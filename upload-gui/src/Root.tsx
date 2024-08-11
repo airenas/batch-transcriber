@@ -14,7 +14,7 @@ function render(App: ComponentType) {
     <StrictMode>
       <RecoilRoot>
         <HelmetProvider>
-          <VersionLogger/>
+          <VersionLogger />
           <ThemeProvider>
             <App />
           </ThemeProvider>

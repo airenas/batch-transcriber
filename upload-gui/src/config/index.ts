@@ -56,8 +56,18 @@ const defaultMetaTags = {
 };
 
 const makeLink = (path: string | undefined): string => {
-  return `${basePath}${path}`
-}
+  return `${basePath}${path}`;
+};
 
-export { dateFormat, defaultMetaTags, email, loader, makeLink, messages, notifications, repository, serverUrl, title };
-
+export {
+  dateFormat,
+  defaultMetaTags,
+  email,
+  loader,
+  makeLink,
+  messages,
+  notifications,
+  repository,
+  serverUrl,
+  title,
+};

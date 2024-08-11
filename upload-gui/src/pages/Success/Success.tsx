@@ -14,7 +14,6 @@ function Success() {
   const navigate = useNavigate();
   const [theme] = useTheme();
 
-
   function navigateNew(): void {
     navigate(makeLink('/'));
   }
@@ -24,15 +23,23 @@ function Success() {
       <Meta title="sėkmingai nusiųsta" />
       <FullSizeCenteredFlexBox>
         <Stack spacing={2}>
-          <Typography variant="h3" color={theme === 'light' ? 'primary' : 'text.secondary'} >Failas nusiųstas</Typography>
+          <Typography variant="h3" color={theme === 'light' ? 'primary' : 'text.secondary'}>
+            Failas nusiųstas
+          </Typography>
 
-          {id && <Typography variant="h4" color={theme === 'light' ? 'primary' : 'text.secondary'}>Suteiktas vardas: {id}</Typography>}
+          {id && (
+            <Typography variant="h4" color={theme === 'light' ? 'primary' : 'text.secondary'}>
+              Suteiktas vardas: {id}
+            </Typography>
+          )}
 
-          <Box sx={{ height: '50px' }} >
-            <Button variant="contained" color='primary' onClick={navigateNew}>Siųsti naują failą</Button>
+          <Box sx={{ height: '50px' }}>
+            <Button variant="contained" color="primary" onClick={navigateNew}>
+              Siųsti naują failą
+            </Button>
           </Box>
         </Stack>
-      </FullSizeCenteredFlexBox >
+      </FullSizeCenteredFlexBox>
     </>
   );
 }

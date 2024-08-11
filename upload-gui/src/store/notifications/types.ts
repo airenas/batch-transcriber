@@ -24,4 +24,3 @@ type Actions = {
 };
 
 export type { Actions, Notification };
-

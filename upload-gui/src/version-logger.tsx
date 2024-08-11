@@ -6,7 +6,7 @@ const VersionLogger: React.FC = () => {
     console.log(`version: ${VERSION}`);
   }, []);
 
-  return null; 
+  return null;
 };
 
 export default VersionLogger;

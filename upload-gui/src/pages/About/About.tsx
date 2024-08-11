@@ -9,6 +9,7 @@ function About() {
       <Meta title="apie" />
       <FullSizeCenteredFlexBox>
         <Typography variant="h2">Di Polis Audio saugykla</Typography>
+        <div>...</div>
       </FullSizeCenteredFlexBox>
     </>
   );

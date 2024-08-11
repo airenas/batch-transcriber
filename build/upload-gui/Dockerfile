@@ -21,9 +21,13 @@ RUN npm run build
 #############################################################################
 FROM nginxinc/nginx-unprivileged:1.27-alpine3.19
 
+COPY LICENSE /licenses/LICENSE-bsd-3
+COPY upload-gui/LICENSE /licenses/LICENSE-mit
+
 COPY build/upload-gui/entrypoint.sh /docker-entrypoint.d/40-cfg-entrypoint.sh
 COPY build/upload-gui/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
+
 
 USER root
 

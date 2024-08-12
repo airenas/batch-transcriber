@@ -9,5 +9,7 @@ diesel::table! {
         try_count -> Int4,
         created -> Timestamp,
         updated -> Timestamp,
+        error_msg -> Text,
+        upload_time -> Nullable<Timestamp>,
     }
 }

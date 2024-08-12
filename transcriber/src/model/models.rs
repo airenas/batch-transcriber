@@ -1,5 +1,5 @@
-use diesel::prelude::*;
 use chrono::NaiveDateTime;
+use diesel::prelude::*;
 
 #[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::model::schema::work_data)]
@@ -11,5 +11,7 @@ pub struct WorkData {
     pub base_dir: String,
     pub try_count: i32,
     pub created: NaiveDateTime,
-    pub updated: NaiveDateTime
+    pub updated: NaiveDateTime,
+    pub error_msg: String,
+    pub upload_time: Option<NaiveDateTime>,
 }

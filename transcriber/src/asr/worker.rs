@@ -69,26 +69,34 @@ impl Worker {
             log::warn!("Max retries reached");
 
             let mut external_id = "".to_string();
-            if let Ok(item) = self.load_item(msg_asr.clone()).await {
+            let mut error = "max retries reached".to_string();
+            if let Ok(item) = self.load_item_or_insert(msg_asr.clone()).await {
                 external_id = item.external_id;
+                if !item.error_msg.is_empty() {
+                    error = format!("{}\nError:\n{}", error, item.error_msg);
+                }
             }
 
             // don't fail here, just try send status message
-            if let Err(err) = self
-                .send_status(&msg_asr, true, "max retries reached", &external_id)
-                .await
-            {
+            if let Err(err) = self.send_status(&msg_asr, true, &error, &external_id).await {
                 log::error!("can't send status message: {}", err);
             }
             return Ok(true);
         }
-        let mut item = self.load_item(msg_asr.clone()).await?;
+        let mut item = self.load_item_or_insert(msg_asr.clone()).await?;
         let ct = CancellationToken::new();
         let _st_dg = ct.clone().drop_guard();
         let job_handle: JoinHandle<()> = self.keep_in_progress(ct.clone(), msg.msg_id);
 
         if item.external_id.is_empty() {
-            let external_id = self.upload(&msg_asr).await?;
+            let external_id = self.upload(&msg_asr).await;
+            let external_id = match external_id {
+                Ok(v) => v,
+                Err(e) => {
+                    self.update_error(msg_asr.id.clone(), e.to_string()).await?;
+                    return Err(e);
+                }
+            };
             log::info!("Uploaded: {}", external_id);
             self.update_external_id(msg_asr.id.clone(), external_id.clone())
                 .await?;
@@ -106,7 +114,7 @@ impl Worker {
         Ok(true)
     }
 
-    async fn load_item(&self, msg_asr: ASRMessage) -> anyhow::Result<WorkData> {
+    async fn load_item_or_insert(&self, msg_asr: ASRMessage) -> anyhow::Result<WorkData> {
         let conn = self.pool.get().await?;
         let result = conn
             .interact(move |conn| {
@@ -148,7 +156,32 @@ impl Worker {
                 use schema::work_data::dsl::*;
                 diesel::update(work_data)
                     .filter(id.eq(id_v))
-                    .set(external_id.eq(external_id_v))
+                    .set((
+                        external_id.eq(external_id_v),
+                        updated.eq(chrono::Utc::now().naive_utc()),
+                        upload_time.eq(chrono::Utc::now().naive_utc()),
+                        try_count.eq(try_count + 1),
+                    ))
+                    .execute(conn)
+            })
+            .await
+            .map_err(|err| format!("can't update work data: {}", err))
+            .map_err(anyhow::Error::msg)??;
+        Ok(())
+    }
+
+    async fn update_error(&self, id_v: String, error: String) -> anyhow::Result<()> {
+        let conn = self.pool.get().await?;
+        _ = conn
+            .interact(move |conn| {
+                use schema::work_data::dsl::*;
+                diesel::update(work_data)
+                    .filter(id.eq(id_v))
+                    .set((
+                        error_msg.eq(error.to_string()),
+                        updated.eq(chrono::Utc::now().naive_utc()),
+                        try_count.eq(try_count + 1),
+                    ))
                     .execute(conn)
             })
             .await

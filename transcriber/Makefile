@@ -22,8 +22,19 @@ test/lint:
 	cargo clippy --all-targets --all-features -- -D warnings
 .PHONY: test/lint	
 ###############################################################################
-generate/db:
+diesel/migrate:
 	diesel migration run
+diesel/generate: diesel/migrate
+	@echo "File schema.rs created. move it to model/schema.rs!!"
+diesel/redo:
+	diesel migration redo
+diesel/revert:
+	diesel migration revert	
+diesel/check-last:
+	diesel migration redo
+diesel/new/migration:
+	diesel migration generate $(name)
+
 
 .EXPORT_ALL_VARIABLES:
 

@@ -23,6 +23,7 @@ services:
   dbmigrate:
     image:   airenas/bt-dbmigrate:${VERSION}
     logging: *default-logging
+    restart: on-failure
     environment:
       - DATABASE_URL=${POSTGRES_URL}
     depends_on:
@@ -53,7 +54,7 @@ services:
       - RUST_LOG=INFO
 
   upload-gui:
-    image:   airenas/bt-upload-gui:${VERSION}
+    image:   airenas/bt-upload-gui:${GUI_VERSION}
     logging: *default-logging
     ports:
       - "8002:8000"

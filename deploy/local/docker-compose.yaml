@@ -21,7 +21,7 @@ services:
       - POSTGRES_DB=asr
 
   dbmigrate:
-    image:   airenas/bt-dbmigrate:${MIGRATE_VERSION}
+    image:   airenas/bt-dbmigrate:${VERSION}
     logging: *default-logging
     environment:
       - DATABASE_URL=${POSTGRES_URL}
@@ -29,7 +29,7 @@ services:
       - postgres  
 
   worker:
-    image:   airenas/bt-worker:dev
+    image:   airenas/bt-worker:${VERSION}
     logging: *default-logging
     volumes:
       - ./.data:/data:rw
@@ -41,7 +41,7 @@ services:
       - RUST_LOG=INFO
 
   keeper:
-    image:   airenas/bt-sound-keeper:dev
+    image:   airenas/bt-sound-keeper:${VERSION}
     logging: *default-logging
     volumes:
       - ./.data:/data:rw
@@ -53,7 +53,7 @@ services:
       - RUST_LOG=INFO
 
   upload-gui:
-    image:   airenas/bt-upload-gui:dev
+    image:   airenas/bt-upload-gui:${VERSION}
     logging: *default-logging
     ports:
       - "8002:8000"

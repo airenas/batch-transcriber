@@ -107,7 +107,7 @@ impl Worker {
         self.filer
             .save_txt(&make_name(&new_f_name, ".txt"), DIR_PROCESSED, &res)?;
         self.filer
-            .save_txt(&make_name(&new_f_name, ".lat"), DIR_PROCESSED, &res_lat)?;
+            .save_txt(&make_name(&new_f_name, ".lat.txt"), DIR_PROCESSED, &res_lat)?;
         self.filer
             .move_to(&f_name, &new_f_name, DIR_WORKING, DIR_PROCESSED)?;
         if let Err(e) = self.filer.move_to(

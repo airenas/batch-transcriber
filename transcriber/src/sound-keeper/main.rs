@@ -38,7 +38,7 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
 
     log::info!("Connecting to postgres...");
     let f = Filer::new(&args.base_dir);
-    
+
     let cors = CorsLayer::new()
         .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
         .allow_origin(Any);

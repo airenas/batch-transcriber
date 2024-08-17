@@ -4,9 +4,9 @@ use transcriber::postgres::queue::PQueue;
 use transcriber::{data::api::ASRMessage, DIR_WORKING};
 
 use clap::Parser;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use transcriber::{QSender, DIR_INCOMING, INFO_EXTENSION, INPUT_QUEUE};
 use ulid::Ulid;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Add audio task to to transcription queue
 #[derive(Parser, Debug)]
@@ -55,9 +55,24 @@ async fn main_int(args: Args) -> anyhow::Result<()> {
     let sender = Box::new(pq) as Box<dyn QSender<ASRMessage>>;
     let f = Filer::new(&args.base_dir);
     let added = if args.auto {
-        add_files(sender.as_ref(), &f, &args.base_dir, &args.server_base_dir, args.only_msg).await?
+        add_files(
+            sender.as_ref(),
+            &f,
+            &args.base_dir,
+            &args.server_base_dir,
+            args.only_msg,
+        )
+        .await?
     } else {
-        add_file(sender.as_ref(), &f, &file, &args.base_dir, &args.server_base_dir, args.only_msg).await?
+        add_file(
+            sender.as_ref(),
+            &f,
+            &file,
+            &args.base_dir,
+            &args.server_base_dir,
+            args.only_msg,
+        )
+        .await?
     };
     if added == 0 {
         log::warn!("No files to transcribe");

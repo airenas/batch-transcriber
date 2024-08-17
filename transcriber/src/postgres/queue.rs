@@ -112,9 +112,7 @@ where
     log::info!("Run: {}", name);
     loop {
         let mut was: bool = false;
-        let res = queue
-            .process(&func)
-            .await;
+        let res = queue.process(&func).await;
         match res {
             Ok(v) => {
                 was = v;

@@ -3,12 +3,12 @@ use deadpool_diesel::Runtime;
 use std::error::Error;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use transcriber::asr::client::ASRClient;
 use transcriber::asr::{clean_worker, res_worker, worker};
 use transcriber::filer::file::Filer;
 use transcriber::postgres::queue::PQueue;
 use transcriber::{shutdown_signal, CLEAN_QUEUE, INPUT_QUEUE, RESULT_QUEUE};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use clap::Parser;
 

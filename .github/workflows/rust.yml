@@ -28,8 +28,26 @@ jobs:
       - name: Build 
         run: make build/local     
 
+      - name: Check format 
+        run: make test/format   
+
+      - name: Lint 
+        run: make test/lint
+
       - name: Test 
         run: make test/unit     
 
-      - name: Lint 
-        run: make test/lint     
+      - name: Install requirements 
+        run: make install/checks
+
+      - name: Audit 
+        run: make audit
+        continue-on-error: true 
+
+      - name: Coverage 
+        run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: false

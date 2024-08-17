@@ -7,7 +7,7 @@ build = "build.rs"
 [dependencies]
 clap = { version = "4.5.9", features = ["derive", "env"] }
 log = "0.4.22"
-pgmq = "0.28.2"
+pgmq = "0.29"
 tokio = { version = "1.36.0", features = ["full"] }
 tokio-util = { version = "0.7.11", features = ["rt"] }
 serde = { version = "1.0.152" }
@@ -30,6 +30,7 @@ thiserror = "1.0.63"
 futures = "0.3.30"
 scopeguard = "1.2.0"
 openssl = { version = "0.10", features = ["vendored"] }
+sqlx = "0.7"
 
 [dev-dependencies]
 test-case = "3.3.1"

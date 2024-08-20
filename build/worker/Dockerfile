@@ -3,7 +3,7 @@
 #########################################################################################
 FROM rust:1.79-buster AS builder
 
-RUN apt-get update && apt-get -y install openssl libssl-dev
+# RUN apt-get update && apt-get -y install openssl libssl-dev
 
 ARG BUILD_VERSION=0.1
 
@@ -12,18 +12,18 @@ WORKDIR /src/
 COPY ./transcriber/ /src
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-      CARGO_APP_VERSION=$BUILD_VERSION OPENSSL_STATIC=1 cargo build --release --bin worker
+      CARGO_APP_VERSION=$BUILD_VERSION cargo build --release --bin worker
 
+#########################################################################################
+FROM gcr.io/distroless/cc-debian11 AS ssl
 #########################################################################################
 FROM debian:buster AS pg-builder
 #########################################################################################
 RUN apt-get update
 RUN apt-get update && apt-get -y install libpq5
-RUN ls -la /lib/x86_64-linux-gnu/libkeyutils*
-
 #########################################################################################
 # Debian 12 does not include ssl libs
-FROM gcr.io/distroless/cc-debian11 AS runner
+FROM gcr.io/distroless/cc-debian12 AS runner
 #########################################################################################
 
 WORKDIR /app
@@ -51,6 +51,10 @@ COPY --from=pg-builder /usr/lib/x86_64-linux-gnu/libffi.so* /usr/lib/x86_64-linu
 COPY --from=pg-builder /lib/x86_64-linux-gnu/libcom_err.so.2 /lib/x86_64-linux-gnu/libcom_err.so.2
 COPY --from=pg-builder /lib/x86_64-linux-gnu/libcom_err.so.2.1 /lib/x86_64-linux-gnu/libcom_err.so.2.1
 COPY --from=pg-builder /lib/x86_64-linux-gnu/libkeyutils.so.1 /lib/x86_64-linux-gnu/libkeyutils.so.1
+
+### /ssl
+COPY --from=ssl /usr/lib/x86_64-linux-gnu/libssl.so.* /lib/x86_64-linux-gnu/
+COPY --from=ssl /usr/lib/x86_64-linux-gnu/libcrypto.so.* /lib/x86_64-linux-gnu/
 #########################################################################################
 
 COPY --from=builder /src/target/release/worker /app/

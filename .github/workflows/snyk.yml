@@ -8,6 +8,7 @@ on:
     - "transcriber/**"
     - "build/**"
     - "upload-gui/**"  
+    - ".github/**"  
 jobs:
   analyze:
     runs-on: ubuntu-latest

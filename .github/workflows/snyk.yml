@@ -1,14 +1,20 @@
 name: snyk vulnerabilities
+
 on:
   push:
     branches: [ main ]
+    paths:
+      - "transcriber/**"
+      - "build/**"
+      - "upload-gui/**"  
+      - ".github/**"
   pull_request:
     branches: [ main ]
-  paths:
-    - "transcriber/**"
-    - "build/**"
-    - "upload-gui/**"  
-    - ".github/**"  
+    paths:
+      - "transcriber/**"
+      - "build/**"
+      - "upload-gui/**"  
+      - ".github/**"
 jobs:
   analyze:
     runs-on: ubuntu-latest

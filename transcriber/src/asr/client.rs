@@ -35,6 +35,7 @@ pub struct ASRClient {
     auth_key: String,
     model: String,
     client: reqwest::Client,
+    old_clean: bool,
 }
 
 impl ASRClient {
@@ -42,6 +43,7 @@ impl ASRClient {
         url: &str,
         auth_key: &str,
         model: &str,
+        old_clean: bool,
     ) -> Result<Self, Box<dyn Error + Send + Sync>> {
         log::info!("Init ASRClient");
         log::info!("URL: {url}");
@@ -54,6 +56,7 @@ impl ASRClient {
             auth_key: auth_key.to_string(),
             client,
             model: model.to_string(),
+            old_clean,
         })
     }
 
@@ -230,8 +233,8 @@ impl ASRClient {
 
     pub async fn clean(&self, id: &str) -> anyhow::Result<()> {
         log::info!("clean id: {}", id);
-        let url = format!("{}/clean.service/delete/{}", self.url, id);
-
+        let url = get_clean_url(&self.url, self.old_clean, id);
+        log::info!("clean url: {}", url);
         let policy = RetryPolicy::exponential(Duration::from_secs(1))
             .with_max_retries(3)
             .with_jitter(true);
@@ -267,6 +270,13 @@ impl ASRClient {
             ))
         }
     }
+}
+
+fn get_clean_url(url: &str, old_clean: bool, id: &str) -> String {
+    if old_clean {
+        return format!("{}/clean.service/{}", url, id);
+    }
+    format!("{}/clean.service/delete/{}", url, id)
 }
 
 #[allow(clippy::borrowed_box)]
@@ -318,6 +328,13 @@ mod tests {
     #[test_case(100 * 1024 * 1024, Duration::from_secs(60); "100 MB")]
     fn test_get_timeout(file_size: u64, wanted: Duration) {
         let actual = get_timeout(file_size);
+        assert_eq!(wanted, actual)
+    }
+
+    #[test_case("http://olia/", false, "10", "http://olia//clean.service/delete/10")]
+    #[test_case("http://olia/", true, "10", "http://olia//clean.service/10")]
+    fn test_clean_url(url: &str, old: bool, id: &str, wanted: &str) {
+        let actual = get_clean_url(url, old, id);
         assert_eq!(wanted, actual)
     }
 }

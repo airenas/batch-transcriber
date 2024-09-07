@@ -39,6 +39,10 @@ struct Args {
     /// ASR recognizer
     #[arg(long, env, default_value = "ben")]
     asr_recognizer: String,
+
+    /// ASR recognizer
+    #[arg(long, env, default_value = "false")]
+    old_clean_service: bool,
 }
 
 async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -47,6 +51,7 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
     log::info!("Base dir     : {}", args.base_dir);
     log::info!("ASR URL      : {}", args.asr_url);
     log::info!("ASR Model    : {}", args.asr_recognizer);
+    log::info!("Old clean    : {}", args.old_clean_service);
 
     let f = Filer::new(&args.base_dir);
     log::info!("Connecting to postgres...");
@@ -56,7 +61,12 @@ async fn main_int(args: Args) -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let manager = Manager::new(args.postgres_url, Runtime::Tokio1);
     let pool = Pool::builder(manager).max_size(8).build()?;
-    let asr_client = ASRClient::new(&args.asr_url, &args.asr_auth_key, &args.asr_recognizer)?;
+    let asr_client = ASRClient::new(
+        &args.asr_url,
+        &args.asr_auth_key,
+        &args.asr_recognizer,
+        args.old_clean_service,
+    )?;
     let token = CancellationToken::new();
 
     let tracker = TaskTracker::new();

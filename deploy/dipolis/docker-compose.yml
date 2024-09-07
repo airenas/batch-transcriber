@@ -39,6 +39,7 @@ services:
       - RUST_LOG=INFO
       - ASR_RECOGNIZER=${ASR_MODEL}
       - WORKER_COUNT=5
+      - OLD_CLEAN_SERVICE=true
 
   keeper:
     image:   airenas/bt-sound-keeper:${VERSION}

@@ -26,7 +26,7 @@ services:
       - postgres
 
   worker:
-    image:   airenas/bt-worker:${VERSION}
+    image:   airenas/bt-worker:${WORKER_VERSION}
     logging: *default-logging
     volumes:
       - ${DATA_DIR}:/data:rw

@@ -16,6 +16,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 #########################################################################################
 FROM gcr.io/distroless/cc-debian12 AS runner
 
+COPY LICENSE /licenses/LICENSE-bsd-3
+
 # RUN apt-get update && apt-get -y install openssl ca-certificates
 
 # ENV UID=999

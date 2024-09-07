@@ -26,6 +26,8 @@ RUN apt-get update && apt-get -y install libpq5
 FROM gcr.io/distroless/cc-debian12 AS runner
 #########################################################################################
 
+COPY LICENSE /licenses/LICENSE-bsd-3
+
 WORKDIR /app
 
 #########################################################################################

@@ -10,8 +10,8 @@ help:
 install: init/dir .env
 	docker compose up -d --scale file-adder=0
 .PHONY: install
-.env: .env.in 
-	cat $< | envsubst > $@
+.env: .env.in Makefile.options
+	cat .env.in | envsubst > $@
 ########################################################################################################
 status: 
 	docker compose ps

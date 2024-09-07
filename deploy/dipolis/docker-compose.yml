@@ -37,6 +37,8 @@ services:
       - BASE_DIR=/data
       - ASR_URL=${ASR_URL}
       - RUST_LOG=INFO
+      - ASR_RECOGNIZER=${ASR_MODEL}
+      - WORKER_COUNT=5
 
   keeper:
     image:   airenas/bt-sound-keeper:${VERSION}
@@ -67,6 +69,7 @@ services:
     user: "${ASR_UID}:${ASR_GID}"
     command: --auto
     environment:
+      - POSTGRES_URL=${POSTGRES_URL}
       - BASE_DIR=/data
       - SERVER_BASE_DIR=/data
       - RUST_LOG=INFO,sqlx=WARN

@@ -84,7 +84,7 @@ services:
       - SERVER_URL=http://pd-di-call/bt-upload-service
     labels:
      - "traefik.enable=true"
-     - "traefik.http.routers.bt-upload-gui.rule=PathPrefix(`/{path:(?i)audio-upload}`)"
+     - "traefik.http.routers.bt-upload-gui.rule=PathPrefix(`/audio-upload`)"
      - "traefik.http.routers.bt-upload-gui.entrypoints=web,websecure"
      - "traefik.http.routers.bt-upload-gui.middlewares=bt-upload-gui"
      - "traefik.http.middlewares.bt-upload-gui.stripprefix.prefixes=/audio-upload" 

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 echo "Set base path to '$BASE_PATH'"
-find /usr/share/nginx/html -type f -exec sed -i "s|/__BASE_PATH_/|$BASE_PATH|g" {} +
+find /usr/share/nginx/html -type f -exec sed -i "s|/__BASE_PATH__/|$BASE_PATH|g" {} +
 echo "Set base path to '$BASE_PATH' done"
 
 echo "Set SERVER_URL to '$SERVER_URL'"

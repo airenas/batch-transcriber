@@ -9,6 +9,20 @@ x-logging:
 
 services:
 
+  traefik:
+    container_name: traefik
+    image: traefik:v2.10
+    command:
+      - --entrypoints.web.address=:80
+      - --log.level=debug
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+      - --api
+    ports:
+      - "8080:80"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
   postgres:
     image:   postgres:16.3
     container_name: postgres
@@ -56,10 +70,16 @@ services:
   upload-gui:
     image:   airenas/bt-upload-gui:${GUI_VERSION}
     logging: *default-logging
-    ports:
-      - "8002:8000"
+    # ports:
+    #   - "8002:8000"
     environment:
-      - BASE_PATH=/test
+      - BASE_PATH=/audio-upload/
       - SERVER_URL=http://localhost:8001/upload
-
+    labels:
+     - "traefik.enable=true" 
+     - "traefik.http.routers.upload.rule=PathPrefix(`/audio-upload`)"
+     - "traefik.http.routers.upload.middlewares=upload"
+     - "traefik.http.routers.upload.entrypoints=web"
+     - "traefik.http.middlewares.upload.stripprefix.prefixes=/audio-upload"
+     - "traefik.http.services.upload.loadbalancer.server.port=8000"  
     

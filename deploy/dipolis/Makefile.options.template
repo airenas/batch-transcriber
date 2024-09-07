@@ -1,0 +1,13 @@
+### dynamic
+data_dir=
+postgres_pass=
+
+### static
+asr_url=http://localhost/ausis
+proxy_network=proxy_default
+
+## user id and group
+## can be get with cmd `id`
+## admin, or current user, or some dedicated user
+asr_uid=0
+asr_gid=0

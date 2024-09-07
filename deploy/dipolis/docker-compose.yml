@@ -1,0 +1,95 @@
+x-logging:
+  &default-logging
+  options:
+    max-size: '20m'
+    max-file: '3'
+  driver: json-file
+
+services:
+
+  postgres:
+    image:   postgres:16.3
+    container_name: postgres
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASS}
+      - POSTGRES_DB=asr
+
+  dbmigrate:
+    image:   airenas/bt-dbmigrate:${VERSION}
+    logging: *default-logging
+    restart: on-failure
+    environment:
+      - DATABASE_URL=${POSTGRES_URL}
+    depends_on:
+      - postgres
+
+  worker:
+    image:   airenas/bt-worker:${VERSION}
+    logging: *default-logging
+    volumes:
+      - ${DATA_DIR}:/data:rw
+    user: "${ASR_UID}:${ASR_GID}"
+    restart: unless-stopped
+    environment:
+      - POSTGRES_URL=${POSTGRES_URL}
+      - BASE_DIR=/data
+      - ASR_URL=${ASR_URL}
+      - RUST_LOG=INFO
+
+  keeper:
+    image:   airenas/bt-sound-keeper:${VERSION}
+    logging: *default-logging
+    volumes:
+      - ${DATA_DIR}:/data:rw
+    user: "${ASR_UID}:${ASR_GID}"
+    restart: unless-stopped
+    environment:
+      - BASE_DIR=/data
+      - RUST_LOG=INFO
+    labels:
+     - "traefik.enable=true"
+     - "traefik.http.routers.bt-keeper.rule=PathPrefix(`/{path:(?i)bt-upload-service}`)"
+     - "traefik.http.routers.bt-keeper.entrypoints=web,websecure"
+     - "traefik.http.routers.bt-keeper.middlewares=bt-keeper"
+     - "traefik.http.middlewares.bt-keeper.stripprefix.prefixes=/bt-upload-service" 
+    #  - "traefik.http.routers.demo-service.tls=true"
+    #  - "traefik.http.routers.demo-service.tls.certResolver=le-resolver"
+    #  - "traefik.http.routers.demo-service.tls.domains[0].main=${HOST}"
+     - "traefik.http.services.bt-keeper.loadbalancer.server.port=8000"     
+
+  file-adder:
+    image:   airenas/bt-file-adder:${FL_VERSION}
+    logging: *default-logging
+    volumes:
+      - ${DATA_DIR}:/data:rw
+    user: "${ASR_UID}:${ASR_GID}"
+    command: --auto
+    environment:
+      - BASE_DIR=/data
+      - SERVER_BASE_DIR=/data
+      - RUST_LOG=INFO,sqlx=WARN
+
+  upload-gui:
+    image:   airenas/bt-upload-gui:${GUI_VERSION}
+    logging: *default-logging
+    restart: unless-stopped
+    environment:
+      - BASE_PATH=/audio-upload
+      - SERVER_URL=http://pd-di-call/bt-upload-service
+    labels:
+     - "traefik.enable=true"
+     - "traefik.http.routers.bt-upload-gui.rule=PathPrefix(`/{path:(?i)audio-upload}`)"
+     - "traefik.http.routers.bt-upload-gui.entrypoints=web,websecure"
+     - "traefik.http.routers.bt-upload-gui.middlewares=bt-upload-gui"
+     - "traefik.http.middlewares.bt-upload-gui.stripprefix.prefixes=/audio-upload" 
+    #  - "traefik.http.routers.demo-service.tls=true"
+    #  - "traefik.http.routers.demo-service.tls.certResolver=le-resolver"
+    #  - "traefik.http.routers.demo-service.tls.domains[0].main=${HOST}"
+     - "traefik.http.services.bt-upload-gui.loadbalancer.server.port=8000"     
+
+networks:
+  default:
+    external:
+      name: ${PROXY_NETWORK} # goes from list compose

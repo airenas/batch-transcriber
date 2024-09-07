@@ -53,7 +53,7 @@ services:
       - RUST_LOG=INFO
     labels:
      - "traefik.enable=true"
-     - "traefik.http.routers.bt-keeper.rule=PathPrefix(`/{path:(?i)bt-upload-service}`)"
+     - "traefik.http.routers.bt-keeper.rule=PathPrefix(`/bt-upload-service}`)"
      - "traefik.http.routers.bt-keeper.entrypoints=web,websecure"
      - "traefik.http.routers.bt-keeper.middlewares=bt-keeper"
      - "traefik.http.middlewares.bt-keeper.stripprefix.prefixes=/bt-upload-service" 
@@ -80,8 +80,8 @@ services:
     logging: *default-logging
     restart: unless-stopped
     environment:
-      - BASE_PATH=/audio-upload
-      - SERVER_URL=http://pd-di-call/bt-upload-service
+      - BASE_PATH=/audio-upload/
+      - SERVER_URL=http://pd-di-call.policija.lt/bt-upload-service
     labels:
      - "traefik.enable=true"
      - "traefik.http.routers.bt-upload-gui.rule=PathPrefix(`/audio-upload`)"
